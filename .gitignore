@@ -48,3 +48,4 @@ pnpm-debug.log*
 # Supabase Local
 .supabase/
 supabase/.temp/
+scripts/
