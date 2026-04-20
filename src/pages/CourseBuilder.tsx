@@ -7,7 +7,7 @@ import { PageContainer } from "@/components/shared/page-container";
 import { PageHeader } from "@/components/shared/page-header";
 import { CourseDetails } from "@/components/admin/courses/CourseDetails";
 import { CourseForm } from "@/components/admin/courses/CourseForm";
-import type { CourseDetailsData, CourseFormValues } from "@/components/admin/courses/types";
+import type { CourseDetailsData, CourseFormValues, LessonRecord } from "@/components/admin/courses/types";
 import { courseService } from "@/services/courseService";
 import { storageService } from "@/services/storageService";
 import { useInstructorOptions } from "@/features/instructors/hooks/useInstructors";
@@ -18,12 +18,62 @@ export default function CourseBuilder() {
   const [loading, setLoading] = useState(true);
   const [savingCourse, setSavingCourse] = useState(false);
   const [savingCurriculum, setSavingCurriculum] = useState(false);
+  const [liveActionLessonId, setLiveActionLessonId] = useState<string | null>(null);
   const [editingCourseOpen, setEditingCourseOpen] = useState(false);
   const [details, setDetails] = useState<CourseDetailsData | null>(null);
   const { data: instructors = [] } = useInstructorOptions();
 
+  const instructorOptions = useMemo(() => {
+    return instructors.map((instructor) => ({
+      id: instructor.id,
+      name: instructor.fullName,
+      email: instructor.email,
+      role: instructor.isActive ? "Instructor" : "Inactive",
+      profileImage: instructor.profileImage,
+      isActive: instructor.isActive,
+    }));
+  }, [instructors]);
+
   useEffect(() => {
     void loadData();
+  }, [courseId]);
+
+  useEffect(() => {
+    if (!courseId) return;
+
+    let cleanup: (() => Promise<void>) | null = null;
+    let isDisposed = false;
+
+    void (async () => {
+      cleanup = await courseService.watchCourseLessonChanges(courseId, (lesson) => {
+        setDetails((current) => {
+          if (!current) return current;
+
+          const nextSubjects = current.subjects.map((subject) => ({
+            ...subject,
+            modules: subject.modules.map((module) => {
+              if (module.id !== lesson.moduleId) return module;
+              return {
+                ...module,
+                lessons: module.lessons.map((currentLesson) => (currentLesson.id === lesson.id ? lesson : currentLesson)),
+              };
+            }),
+          }));
+
+          const nextModules = nextSubjects.flatMap((subject) => subject.modules);
+          return { ...current, subjects: nextSubjects, modules: nextModules };
+        });
+      });
+
+      if (isDisposed) {
+        await cleanup?.();
+      }
+    })();
+
+    return () => {
+      isDisposed = true;
+      void cleanup?.();
+    };
   }, [courseId]);
 
   async function loadData() {
@@ -76,6 +126,79 @@ export default function CourseBuilder() {
       toast.error("Failed to save curriculum");
     } finally {
       setSavingCurriculum(false);
+    }
+  }
+
+  async function handleStartLiveClass(lesson: LessonRecord) {
+    if (!courseId) return;
+    setLiveActionLessonId(lesson.id);
+    const meetingWindow = window.open("about:blank", "_blank");
+    if (meetingWindow) {
+      meetingWindow.document.title = "Opening live class...";
+      meetingWindow.document.body.innerHTML = "<p style='font-family:sans-serif;padding:24px'>Opening live class...</p>";
+    }
+    try {
+      const { lesson: updatedLesson, meetingUrl } = await courseService.startLiveClass(courseId, lesson.id);
+      setDetails((current) => {
+        if (!current) return current;
+
+        const nextSubjects = current.subjects.map((subject) => ({
+          ...subject,
+          modules: subject.modules.map((module) => {
+            if (module.id !== updatedLesson.moduleId) return module;
+            return {
+              ...module,
+              lessons: module.lessons.map((currentLesson) => (currentLesson.id === updatedLesson.id ? updatedLesson : currentLesson)),
+            };
+          }),
+        }));
+
+        return { ...current, subjects: nextSubjects, modules: nextSubjects.flatMap((subject) => subject.modules) };
+      });
+
+      if (meetingWindow) {
+        meetingWindow.location.replace(meetingUrl);
+        meetingWindow.focus();
+      } else {
+        window.open(meetingUrl, "_blank");
+      }
+      toast.success("Live class started");
+    } catch (error) {
+      console.error("Failed to start live class:", error instanceof Error ? error.message : String(error));
+      toast.error("Failed to start live class");
+    } finally {
+      setLiveActionLessonId(null);
+    }
+  }
+
+  async function handleEndLiveClass(lesson: LessonRecord) {
+    if (!courseId) return;
+    setLiveActionLessonId(lesson.id);
+    try {
+      const updatedLesson = await courseService.endLiveClass(courseId, lesson.id);
+      setDetails((current) => {
+        if (!current) return current;
+
+        const nextSubjects = current.subjects.map((subject) => ({
+          ...subject,
+          modules: subject.modules.map((module) => {
+            if (module.id !== updatedLesson.moduleId) return module;
+            return {
+              ...module,
+              lessons: module.lessons.map((currentLesson) => (currentLesson.id === updatedLesson.id ? updatedLesson : currentLesson)),
+            };
+          }),
+        }));
+
+        return { ...current, subjects: nextSubjects, modules: nextSubjects.flatMap((subject) => subject.modules) };
+      });
+
+      toast.success("Live class ended");
+    } catch (error) {
+      console.error("Failed to end live class:", error instanceof Error ? error.message : String(error));
+      toast.error("Failed to end live class");
+    } finally {
+      setLiveActionLessonId(null);
     }
   }
 
@@ -141,6 +264,9 @@ export default function CourseBuilder() {
         analytics={details.analytics}
         onEditCourse={() => setEditingCourseOpen(true)}
         onSaveCurriculum={handleSaveCurriculum}
+        onStartLiveClass={handleStartLiveClass}
+        onEndLiveClass={handleEndLiveClass}
+        liveActionLessonId={liveActionLessonId}
         isSavingCurriculum={savingCurriculum}
       />
 
@@ -148,7 +274,7 @@ export default function CourseBuilder() {
         open={editingCourseOpen}
         onOpenChange={setEditingCourseOpen}
         onSubmit={handleSaveCourse}
-        instructors={instructors}
+        instructors={instructorOptions}
         isSubmitting={savingCourse}
         title="Edit course"
         description="Update course metadata, pricing, or publication state."

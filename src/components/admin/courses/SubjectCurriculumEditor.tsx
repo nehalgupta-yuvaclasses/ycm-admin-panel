@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, GripVertical, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +13,9 @@ type SubjectCurriculumEditorProps = {
   courseId: string;
   subjects: SubjectRecord[];
   onSave: (subjects: SubjectRecord[]) => Promise<void>;
+  onStartLiveClass?: (lesson: LessonRecord) => Promise<void>;
+  onEndLiveClass?: (lesson: LessonRecord) => Promise<void>;
+  liveActionLessonId?: string | null;
   isSaving: boolean;
 };
 
@@ -24,6 +28,10 @@ function createLesson(order: number, moduleId: string): LessonRecord {
     videoUrl: "",
     liveUrl: "",
     scheduledAt: "",
+    isLive: false,
+    liveStartedAt: "",
+    liveEndedAt: "",
+    liveBy: "",
     notes: "",
     duration: "",
     order,
@@ -74,7 +82,15 @@ function normalizeDraft(subjects: SubjectRecord[], courseId: string): SubjectRec
   }));
 }
 
-export function SubjectCurriculumEditor({ courseId, subjects, onSave, isSaving }: SubjectCurriculumEditorProps) {
+export function SubjectCurriculumEditor({
+  courseId,
+  subjects,
+  onSave,
+  onStartLiveClass,
+  onEndLiveClass,
+  liveActionLessonId,
+  isSaving,
+}: SubjectCurriculumEditorProps) {
   const [draft, setDraft] = useState<SubjectRecord[]>(normalizeDraft(subjects, courseId));
   const [draggedSubjectId, setDraggedSubjectId] = useState<string | null>(null);
   const [draggedModuleKey, setDraggedModuleKey] = useState<string | null>(null);
@@ -122,6 +138,10 @@ export function SubjectCurriculumEditor({ courseId, subjects, onSave, isSaving }
                 } else {
                   nextLesson.liveUrl = "";
                   nextLesson.scheduledAt = "";
+                  nextLesson.isLive = false;
+                  nextLesson.liveStartedAt = "";
+                  nextLesson.liveEndedAt = "";
+                  nextLesson.liveBy = "";
                 }
               }
               return nextLesson;
@@ -441,6 +461,22 @@ export function SubjectCurriculumEditor({ courseId, subjects, onSave, isSaving }
                                   </SelectContent>
                                 </Select>
                               </div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                {lesson.lessonType === "live" ? (
+                                  <>
+                                    {lesson.isLive ? (
+                                      <Badge className="rounded-md bg-red-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">LIVE</Badge>
+                                    ) : lesson.liveEndedAt ? (
+                                      <Badge variant="outline" className="rounded-md border-border/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Ended</Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="rounded-md border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-600">Scheduled</Badge>
+                                    )}
+                                    {lesson.scheduledAt ? <span className="text-xs text-muted-foreground">Starts {lesson.scheduledAt}</span> : null}
+                                  </>
+                                ) : (
+                                  <Badge variant="outline" className="rounded-md border-border/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Recorded</Badge>
+                                )}
+                              </div>
                               {lesson.lessonType === "recorded" ? (
                                 <Input value={lesson.videoUrl} onChange={(event) => updateLesson(subject.id, module.id, lesson.id, 'videoUrl', event.target.value)} placeholder="Video URL" />
                               ) : (
@@ -452,7 +488,35 @@ export function SubjectCurriculumEditor({ courseId, subjects, onSave, isSaving }
                               <Textarea value={lesson.notes} onChange={(event) => updateLesson(subject.id, module.id, lesson.id, 'notes', event.target.value)} placeholder="Notes" className="min-h-24" />
                             </div>
 
-                            <div className="flex items-center gap-1 md:pt-1">
+                            <div className="flex flex-col items-end gap-2 md:pt-1">
+                              {lesson.lessonType === "live" ? (
+                                lesson.isLive ? (
+                                  <Button
+                                    type="button"
+                                    variant="default"
+                                    className="gap-2 rounded-lg bg-red-600 text-white hover:bg-red-700"
+                                    onClick={() => onEndLiveClass?.(lesson)}
+                                    disabled={!onEndLiveClass || liveActionLessonId === lesson.id}
+                                  >
+                                    {liveActionLessonId === lesson.id ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                                    End Live Class
+                                  </Button>
+                                ) : lesson.liveEndedAt ? (
+                                  <Badge variant="outline" className="rounded-lg border-border/60 px-3 py-2 text-xs font-medium text-muted-foreground">Class ended</Badge>
+                                ) : (
+                                  <Button
+                                    type="button"
+                                    className="gap-2 rounded-lg"
+                                    onClick={() => onStartLiveClass?.(lesson)}
+                                    disabled={!onStartLiveClass || liveActionLessonId === lesson.id}
+                                  >
+                                    {liveActionLessonId === lesson.id ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                                    Start Live Class
+                                  </Button>
+                                )
+                              ) : null}
+
+                              <div className="flex items-center gap-1">
                               <Button type="button" variant="ghost" size="icon" onClick={() => moveLesson(subject.id, module.id, lesson.id, -1)} disabled={lessonIndex === 0}>
                                 <ArrowUp className="h-4 w-4" />
                               </Button>
@@ -462,6 +526,7 @@ export function SubjectCurriculumEditor({ courseId, subjects, onSave, isSaving }
                               <Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={() => removeLesson(subject.id, module.id, lesson.id)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
+                              </div>
                             </div>
                           </div>
                         </div>

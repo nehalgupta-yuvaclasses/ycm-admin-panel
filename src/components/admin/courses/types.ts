@@ -18,6 +18,10 @@ export interface LessonDraft {
   videoUrl: string;
   liveUrl: string;
   scheduledAt: string;
+  isLive: boolean;
+  liveStartedAt: string;
+  liveEndedAt: string;
+  liveBy: string;
   notes: string;
   duration: string;
   order: number;
@@ -76,6 +80,10 @@ export interface LessonRecord {
   videoUrl: string;
   liveUrl: string;
   scheduledAt: string;
+  isLive: boolean;
+  liveStartedAt: string;
+  liveEndedAt: string;
+  liveBy: string;
   notes: string;
   duration: string;
   order: number;

@@ -59,6 +59,10 @@ type LessonDraft = {
   videoUrl: string;
   liveUrl: string;
   scheduledAt: string;
+  isLive: boolean;
+  liveStartedAt: string;
+  liveEndedAt: string;
+  liveBy: string;
   notes: string;
   duration: string;
   order: number;
@@ -73,6 +77,10 @@ export interface Lecture {
   live_url?: string;
   meeting_link?: string;
   scheduled_at?: string;
+  is_live?: boolean;
+  live_started_at?: string;
+  live_ended_at?: string;
+  live_by?: string | null;
   duration?: string;
   notes?: string;
   order?: number;
@@ -144,6 +152,10 @@ type LessonRow = {
   video_url?: string | null;
   live_url?: string | null;
   scheduled_at?: string | null;
+  is_live?: boolean | null;
+  live_started_at?: string | null;
+  live_ended_at?: string | null;
+  live_by?: string | null;
   notes?: string | null;
   duration?: string | null;
   order?: number | null;
@@ -165,9 +177,88 @@ type EnrollmentRow = {
   updated_at?: string | null;
 };
 
+type LiveLessonContext = {
+  courseId: string;
+  lessonId: string;
+  title?: string;
+};
+
 function toNumber(value: unknown, fallback = 0) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function toLessonRecord(lessonRow: LessonRow): LessonRecord {
+  return {
+    id: lessonRow.id,
+    moduleId: lessonRow.module_id,
+    title: lessonRow.title,
+    lessonType: lessonRow.lesson_type === 'live' || Boolean(lessonRow.live_url) || Boolean(lessonRow.scheduled_at) ? 'live' : 'recorded',
+    videoUrl: lessonRow.video_url || '',
+    liveUrl: lessonRow.live_url || '',
+    scheduledAt: lessonRow.scheduled_at || '',
+    isLive: Boolean(lessonRow.is_live),
+    liveStartedAt: lessonRow.live_started_at || '',
+    liveEndedAt: lessonRow.live_ended_at || '',
+    liveBy: lessonRow.live_by || '',
+    notes: lessonRow.notes || '',
+    duration: lessonRow.duration || '',
+    order: lessonRow.order || 0,
+  };
+}
+
+function buildJitsiRoomUrl({ courseId, lessonId, title }: LiveLessonContext) {
+  const seed = [courseId, lessonId, title || 'live-class']
+    .join('-')
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  return `https://meet.jit.si/yuva-${seed || lessonId}`;
+}
+
+async function getCurrentUserContext() {
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError) {
+    throw authError;
+  }
+
+  const user = authData.user;
+  if (!user) {
+    throw new Error('You must be signed in to manage live classes.');
+  }
+
+  const { data: userRow, error: userError } = await supabase
+    .from('users')
+    .select('id, role')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (userError) {
+    throw userError;
+  }
+
+  return {
+    id: user.id,
+    role: userRow?.role || user.user_metadata?.role || '',
+  };
+}
+
+function patchLessonInCurriculum(subjects: SubjectRecord[], lesson: LessonRecord) {
+  return subjects.map((subject) => ({
+    ...subject,
+    modules: subject.modules.map((module) => {
+      if (module.id !== lesson.moduleId) {
+        return module;
+      }
+
+      return {
+        ...module,
+        lessons: module.lessons.map((currentLesson) => (currentLesson.id === lesson.id ? lesson : currentLesson)),
+      };
+    }),
+  }));
 }
 
 function normalizeCourse(
@@ -307,7 +398,7 @@ async function getCourseCurriculum(courseId: string): Promise<CurriculumBundle> 
   const [subjectsRes, modulesRes, lessonsRes] = await Promise.all([
     supabase.from('subjects').select('id, course_id, name, order, created_at, updated_at').eq('course_id', courseId).order('order', { ascending: true }),
     supabase.from('modules').select('id, course_id, subject_id, title, order, created_at, updated_at').eq('course_id', courseId).order('order', { ascending: true }),
-    supabase.from('lessons').select('id, module_id, title, lesson_type, video_url, live_url, scheduled_at, notes, duration, order, created_at, updated_at'),
+    supabase.from('lessons').select('id, module_id, title, lesson_type, video_url, live_url, scheduled_at, is_live, live_started_at, live_ended_at, live_by, notes, duration, order, created_at, updated_at'),
   ]);
 
   const subjectRows = (subjectsRes.data || []) as SubjectRow[];
@@ -336,18 +427,7 @@ async function getCourseCurriculum(courseId: string): Promise<CurriculumBundle> 
       order: moduleRow.order || 0,
       lessons: (lessonsByModule.get(moduleRow.id) || [])
         .sort((left, right) => toNumber(left.order) - toNumber(right.order))
-        .map((lessonRow) => ({
-          id: lessonRow.id,
-          moduleId: lessonRow.module_id,
-          title: lessonRow.title,
-          lessonType: lessonRow.lesson_type === 'live' || Boolean(lessonRow.live_url) || Boolean(lessonRow.scheduled_at) ? 'live' : 'recorded',
-          videoUrl: lessonRow.video_url || '',
-          liveUrl: lessonRow.live_url || '',
-          scheduledAt: lessonRow.scheduled_at || '',
-          notes: lessonRow.notes || '',
-          duration: lessonRow.duration || '',
-          order: lessonRow.order || 0,
-        })),
+        .map(toLessonRecord),
     });
     modulesBySubject.set(moduleRow.subject_id, current);
   });
@@ -515,6 +595,10 @@ export const courseService = {
                 video_url: lessonType === 'recorded' ? lessonDraft.videoUrl || null : null,
                 live_url: lessonType === 'live' ? lessonDraft.liveUrl || null : null,
                 scheduled_at: lessonType === 'live' ? lessonDraft.scheduledAt || null : null,
+                is_live: Boolean(lessonDraft.isLive),
+                live_started_at: lessonDraft.liveStartedAt || null,
+                live_ended_at: lessonDraft.liveEndedAt || null,
+                live_by: lessonDraft.liveBy || null,
                 notes: lessonDraft.notes || null,
                 duration: lessonDraft.duration || null,
                 order: lessonDraft.order,
@@ -638,6 +722,10 @@ export const courseService = {
                   video_url: lessonType === 'recorded' ? lesson.videoUrl || null : null,
                   live_url: lessonType === 'live' ? lesson.liveUrl || null : null,
                   scheduled_at: lessonType === 'live' ? lesson.scheduledAt || null : null,
+                  is_live: Boolean(lesson.isLive),
+                  live_started_at: lesson.liveStartedAt || null,
+                  live_ended_at: lesson.liveEndedAt || null,
+                  live_by: lesson.liveBy || null,
                   notes: lesson.notes || null,
                   duration: lesson.duration || null,
                   order: lesson.order,
@@ -779,7 +867,7 @@ export const courseService = {
     try {
       const { data, error } = await supabase
         .from('lessons')
-        .select('id, module_id as subject_id, title, lesson_type, video_url, live_url, scheduled_at, duration, notes, order, created_at')
+        .select('id, module_id as subject_id, title, lesson_type, video_url, live_url, scheduled_at, is_live, live_started_at, live_ended_at, live_by, duration, notes, order, created_at')
         .eq('module_id', subjectId)
         .order('order', { ascending: true });
 
@@ -830,7 +918,7 @@ export const courseService = {
     try {
       const { data: current, error: currentError } = await supabase
         .from('lessons')
-        .select('lesson_type, video_url, live_url, scheduled_at, duration, notes, "order"')
+        .select('lesson_type, video_url, live_url, scheduled_at, is_live, live_started_at, live_ended_at, live_by, duration, notes, "order"')
         .eq('id', id)
         .maybeSingle();
 
@@ -840,14 +928,19 @@ export const courseService = {
       }
 
       const lessonType = updates.type || (current?.lesson_type === 'live' || current?.live_url || current?.scheduled_at ? 'live' : 'recorded');
+      const isLiveLesson = lessonType === 'live';
       const { data, error } = await supabase
         .from('lessons')
         .update({
           title: updates.title,
           lesson_type: lessonType,
           video_url: lessonType === 'recorded' ? updates.video_url ?? current?.video_url ?? null : null,
-          live_url: lessonType === 'live' ? updates.live_url ?? updates.meeting_link ?? current?.live_url ?? null : null,
-          scheduled_at: lessonType === 'live' ? updates.scheduled_at ?? current?.scheduled_at ?? null : null,
+          live_url: isLiveLesson ? updates.live_url ?? updates.meeting_link ?? current?.live_url ?? null : null,
+          scheduled_at: isLiveLesson ? updates.scheduled_at ?? current?.scheduled_at ?? null : null,
+          is_live: isLiveLesson ? updates.is_live ?? current?.is_live ?? false : false,
+          live_started_at: isLiveLesson ? updates.live_started_at ?? current?.live_started_at ?? null : null,
+          live_ended_at: isLiveLesson ? updates.live_ended_at ?? current?.live_ended_at ?? null : null,
+          live_by: isLiveLesson ? updates.live_by ?? current?.live_by ?? null : null,
           duration: updates.duration ?? current?.duration ?? null,
           notes: updates.notes ?? current?.notes ?? '',
           order: updates.order ?? current?.order ?? 0,
@@ -866,6 +959,145 @@ export const courseService = {
       console.error('updateLecture exception:', err);
       throw err;
     }
+  },
+
+  async startLiveClass(courseId: string, lessonId: string) {
+    const { data: course, error: courseError } = await supabase
+      .from('courses')
+      .select('id, instructor_id, title')
+      .eq('id', courseId)
+      .maybeSingle();
+
+    if (courseError) {
+      throw courseError;
+    }
+
+    if (!course) {
+      throw new Error('Course not found');
+    }
+
+    const { id: userId, role } = await getCurrentUserContext();
+    if (role !== 'admin' && course.instructor_id && course.instructor_id !== userId) {
+      throw new Error('You are not allowed to start this live class.');
+    }
+
+    const { data: currentLesson, error: lessonError } = await supabase
+      .from('lessons')
+      .select('id, module_id, title, lesson_type, live_url, is_live, live_started_at, live_ended_at, live_by, order, notes, duration, scheduled_at, video_url')
+      .eq('id', lessonId)
+      .maybeSingle();
+
+    if (lessonError) {
+      throw lessonError;
+    }
+
+    if (!currentLesson) {
+      throw new Error('Lesson not found');
+    }
+
+    const meetingUrl = currentLesson.live_url || buildJitsiRoomUrl({ courseId, lessonId, title: currentLesson.title });
+    const { data, error } = await supabase
+      .from('lessons')
+      .update({
+        lesson_type: 'live',
+        live_url: meetingUrl,
+        is_live: true,
+        live_started_at: new Date().toISOString(),
+        live_ended_at: null,
+        live_by: course.instructor_id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', lessonId)
+      .select('id, module_id, title, lesson_type, video_url, live_url, scheduled_at, is_live, live_started_at, live_ended_at, live_by, notes, duration, order, created_at, updated_at')
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return { lesson: toLessonRecord(data as LessonRow), meetingUrl };
+  },
+
+  async endLiveClass(courseId: string, lessonId: string) {
+    const { data: course, error: courseError } = await supabase
+      .from('courses')
+      .select('id, instructor_id')
+      .eq('id', courseId)
+      .maybeSingle();
+
+    if (courseError) {
+      throw courseError;
+    }
+
+    if (!course) {
+      throw new Error('Course not found');
+    }
+
+    const { id: userId, role } = await getCurrentUserContext();
+    if (role !== 'admin' && course.instructor_id && course.instructor_id !== userId) {
+      throw new Error('You are not allowed to end this live class.');
+    }
+
+    const { data, error } = await supabase
+      .from('lessons')
+      .update({
+        is_live: false,
+        live_ended_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', lessonId)
+      .select('id, module_id, title, lesson_type, video_url, live_url, scheduled_at, is_live, live_started_at, live_ended_at, live_by, notes, duration, order, created_at, updated_at')
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return toLessonRecord(data as LessonRow);
+  },
+
+  watchCourseLessonChanges(courseId: string, onChange: (lesson: LessonRecord) => void) {
+    let active = true;
+    const channel = supabase.channel(`public:lesson-live:${courseId}`);
+
+    const boot = async () => {
+      const { data: modules, error } = await supabase
+        .from('modules')
+        .select('id')
+        .eq('course_id', courseId);
+
+      if (error || !active) {
+        return;
+      }
+
+      const moduleIds = (modules || []).map((module: { id: string }) => module.id);
+      const moduleIdSet = new Set(moduleIds);
+
+      channel.on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'lessons',
+        },
+        (payload) => {
+          if (!active) return;
+          const raw = payload.eventType === 'DELETE' ? payload.oldRecord : payload.newRecord;
+          if (!raw || Object.keys(raw).length === 0) return;
+          if (!moduleIdSet.has(String(raw.module_id || ''))) return;
+          onChange(toLessonRecord(raw as LessonRow));
+        },
+      );
+
+      channel.subscribe();
+    };
+
+    void boot();
+
+    return async () => {
+      active = false;
+      await supabase.removeChannel(channel);
+    };
   },
 
   async deleteLecture(id: string) {

@@ -31,6 +31,17 @@ export default function Courses() {
   const [isCreating, setIsCreating] = useState(false);
   const { data: instructors = [] } = useInstructorOptions();
 
+  const instructorOptions = useMemo(() => {
+    return instructors.map((instructor) => ({
+      id: instructor.id,
+      name: instructor.fullName,
+      email: instructor.email,
+      role: instructor.isActive ? "Instructor" : "Inactive",
+      profileImage: instructor.profileImage,
+      isActive: instructor.isActive,
+    }));
+  }, [instructors]);
+
   useEffect(() => {
     void loadCourses();
   }, []);
@@ -192,7 +203,7 @@ export default function Courses() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         onSubmit={handleCreateCourse}
-        instructors={instructors}
+        instructors={instructorOptions}
         isSubmitting={isCreating}
         title="Create course"
         description="Build the course structure, pricing, and publication state in one flow."

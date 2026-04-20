@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import type { CourseAnalytics, CourseSummary, EnrollmentRecord, SubjectRecord } from "./types";
+import type { CourseAnalytics, CourseSummary, EnrollmentRecord, LessonRecord, SubjectRecord } from "./types";
 import { SubjectCurriculumEditor } from "./SubjectCurriculumEditor";
 
 type CourseDetailsProps = {
@@ -16,6 +16,9 @@ type CourseDetailsProps = {
   analytics: CourseAnalytics;
   onEditCourse: () => void;
   onSaveCurriculum: (subjects: SubjectRecord[]) => Promise<void>;
+  onStartLiveClass?: (lesson: LessonRecord) => Promise<void>;
+  onEndLiveClass?: (lesson: LessonRecord) => Promise<void>;
+  liveActionLessonId?: string | null;
   isSavingCurriculum: boolean;
 };
 
@@ -34,12 +37,23 @@ export function CourseDetails({
   analytics,
   onEditCourse,
   onSaveCurriculum,
+  onStartLiveClass,
+  onEndLiveClass,
+  liveActionLessonId,
   isSavingCurriculum,
 }: CourseDetailsProps) {
   const discountPercent = useMemo(() => {
     if (!course.originalPrice) return 0;
     return Math.max(0, Math.round(((course.originalPrice - course.sellingPrice) / course.originalPrice) * 100));
   }, [course.originalPrice, course.sellingPrice]);
+
+  const liveLessons = useMemo(() => {
+    return subjects.reduce((count, subject) => {
+      return count + subject.modules.reduce((moduleCount, module) => {
+        return moduleCount + module.lessons.filter((lesson) => lesson.isLive).length;
+      }, 0);
+    }, 0);
+  }, [subjects]);
 
   return (
     <div className="space-y-6">
@@ -125,6 +139,13 @@ export function CourseDetails({
               </CardHeader>
               <CardContent className="text-sm text-muted-foreground">Current course audience</CardContent>
             </Card>
+            <Card className="rounded-xl border-border/60">
+              <CardHeader className="pb-2">
+                <CardDescription>Live lessons</CardDescription>
+                <CardTitle className="text-2xl">{liveLessons}</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">Lessons currently marked live</CardContent>
+            </Card>
           </div>
 
           <Card className="rounded-xl border-border/60">
@@ -168,7 +189,15 @@ export function CourseDetails({
         </TabsContent>
 
         <TabsContent value="curriculum" className="outline-none">
-          <SubjectCurriculumEditor courseId={course.id} subjects={subjects} onSave={onSaveCurriculum} isSaving={isSavingCurriculum} />
+          <SubjectCurriculumEditor
+            courseId={course.id}
+            subjects={subjects}
+            onSave={onSaveCurriculum}
+            onStartLiveClass={onStartLiveClass}
+            onEndLiveClass={onEndLiveClass}
+            liveActionLessonId={liveActionLessonId}
+            isSaving={isSavingCurriculum}
+          />
         </TabsContent>
 
         <TabsContent value="students" className="outline-none">
