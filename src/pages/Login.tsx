@@ -105,7 +105,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col md:flex-row bg-[#09090b] selection:bg-emerald-500/30 selection:text-emerald-200">
+    <div className="dark min-h-screen w-full flex flex-col md:flex-row bg-[#09090b] selection:bg-emerald-500/30 selection:text-emerald-200">
       {/* Sidebar Section */}
       <div className="hidden md:flex md:w-[40%] lg:w-[45%] relative overflow-hidden flex-col justify-between p-12 text-white border-r border-white/5">
         {/* Animated Background Elements */}
@@ -191,7 +191,7 @@ export default function Login() {
                     type="email"
                     autoComplete="email"
                     placeholder="admin@yuvaclasses.com"
-                    className="h-12 bg-zinc-950/50 border-zinc-800 rounded-xl focus:bg-zinc-950/70 focus:border-emerald-500/50 focus:ring-emerald-500/10 transition-all text-zinc-100 placeholder:text-zinc-500 focus:text-zinc-100 focus:placeholder:text-zinc-400 selection:bg-emerald-500/30 selection:text-white"
+                    className="h-12 bg-zinc-950/50 border-zinc-800 rounded-xl focus-visible:bg-zinc-950/70 focus-visible:border-emerald-500/50 focus-visible:ring-emerald-500/10 transition-all text-zinc-100 placeholder:text-zinc-500 focus-visible:text-zinc-100 focus-visible:placeholder:text-zinc-400 selection:bg-emerald-500/30 selection:text-white"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -210,7 +210,7 @@ export default function Login() {
                       type={showPassword ? "text" : "password"}
                       autoComplete="current-password"
                       placeholder="••••••••••••"
-                      className="h-12 bg-zinc-950/50 border-zinc-800 rounded-xl focus:bg-zinc-950/70 focus:border-emerald-500/50 focus:ring-emerald-500/10 transition-all text-zinc-100 placeholder:text-zinc-500 focus:text-zinc-100 focus:placeholder:text-zinc-400 selection:bg-emerald-500/30 selection:text-white pr-12"
+                      className="h-12 bg-zinc-950/50 border-zinc-800 rounded-xl focus-visible:bg-zinc-950/70 focus-visible:border-emerald-500/50 focus-visible:ring-emerald-500/10 transition-all text-zinc-100 placeholder:text-zinc-500 focus-visible:text-zinc-100 focus-visible:placeholder:text-zinc-400 selection:bg-emerald-500/30 selection:text-white pr-12"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
