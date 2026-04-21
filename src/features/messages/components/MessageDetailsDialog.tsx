@@ -46,43 +46,43 @@ export function MessageDetailsDialog({
 
         <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-zinc-50 border border-zinc-100">
+            <div className="flex items-center gap-3 p-3 rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-900">
               <div className="w-8 h-8 rounded-full bg-white border border-zinc-200 flex items-center justify-center text-zinc-500">
                 <User className="w-4 h-4" />
               </div>
               <div>
                 <p className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Full Name</p>
-                <p className="text-sm font-semibold">{message.full_name}</p>
+                <p className="text-sm font-semibold text-zinc-900">{message.full_name}</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-zinc-50 border border-zinc-100">
+            <div className="flex items-center gap-3 p-3 rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-900">
               <div className="w-8 h-8 rounded-full bg-white border border-zinc-200 flex items-center justify-center text-zinc-500">
                 <Mail className="w-4 h-4" />
               </div>
               <div>
                 <p className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Email Address</p>
-                <p className="text-sm font-semibold">{message.email}</p>
+                <p className="text-sm font-semibold text-zinc-900">{message.email}</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-zinc-50 border border-zinc-100">
+            <div className="flex items-center gap-3 p-3 rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-900">
               <div className="w-8 h-8 rounded-full bg-white border border-zinc-200 flex items-center justify-center text-zinc-500">
                 <Tag className="w-4 h-4" />
               </div>
               <div>
                 <p className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Subject</p>
-                <p className="text-sm font-semibold">{message.subject}</p>
+                <p className="text-sm font-semibold text-zinc-900">{message.subject}</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-zinc-50 border border-zinc-100">
+            <div className="flex items-center gap-3 p-3 rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-900">
               <div className="w-8 h-8 rounded-full bg-white border border-zinc-200 flex items-center justify-center text-zinc-500">
                 <Calendar className="w-4 h-4" />
               </div>
               <div>
                 <p className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Received On</p>
-                <p className="text-sm font-semibold">
+                <p className="text-sm font-semibold text-zinc-900">
                   {format(new Date(message.created_at), 'PPP p')}
                 </p>
               </div>
@@ -94,8 +94,8 @@ export function MessageDetailsDialog({
               <MessageSquare className="w-4 h-4 text-zinc-400" />
               <h4 className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Message Content</h4>
             </div>
-            <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-100 min-h-[120px]">
-              <p className="text-sm text-zinc-700 leading-relaxed whitespace-pre-wrap">
+            <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200 min-h-[120px] text-zinc-900">
+              <p className="text-sm text-zinc-800 leading-relaxed whitespace-pre-wrap">
                 {message.message}
               </p>
             </div>

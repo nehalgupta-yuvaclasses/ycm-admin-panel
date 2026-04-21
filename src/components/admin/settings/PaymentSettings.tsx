@@ -7,14 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { paymentSchema, type PaymentFormValues } from "./types";
 
 type PaymentProps = {
   settings: {
-    provider: "razorpay" | "stripe";
+    provider: "razorpay";
     apiKey: string;
     apiSecret?: string;
     currency: string;
@@ -79,49 +78,15 @@ export function PaymentSettings({ settings, onSave, isSaving }: PaymentProps) {
         <Form {...form}>
           <form className="grid gap-5" onSubmit={form.handleSubmit(handleSubmit)}>
             <div className="grid gap-4 md:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="provider"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Payment provider</FormLabel>
-                    <FormControl>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select provider" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="razorpay">Razorpay</SelectItem>
-                          <SelectItem value="stripe">Stripe</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="space-y-2">
+                <p className="text-[13px] font-semibold tracking-wide text-foreground/80">Payment provider</p>
+                <Input value="Razorpay" disabled readOnly />
+              </div>
 
-              <FormField
-                control={form.control}
-                name="currency"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Currency</FormLabel>
-                    <FormControl>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select currency" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="INR">INR</SelectItem>
-                          <SelectItem value="USD">USD</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="space-y-2">
+                <p className="text-[13px] font-semibold tracking-wide text-foreground/80">Currency</p>
+                <Input value="INR" disabled readOnly />
+              </div>
 
               <FormField
                 control={form.control}

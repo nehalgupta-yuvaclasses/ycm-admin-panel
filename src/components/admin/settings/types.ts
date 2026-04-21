@@ -18,10 +18,10 @@ export const platformSchema = z.object({
 export type PlatformFormValues = z.infer<typeof platformSchema>;
 
 export const paymentSchema = z.object({
-  provider: z.enum(["razorpay", "stripe"]),
+  provider: z.literal("razorpay"),
   apiKey: z.string().trim().min(1, "API key is required"),
   apiSecret: z.string().trim().optional().or(z.literal("")),
-  currency: z.string().trim().min(3, "Currency is required"),
+  currency: z.literal("INR"),
   gstRate: z.coerce.number().min(0, "GST cannot be negative").max(100, "GST cannot exceed 100"),
   enablePayments: z.boolean().default(true),
 });

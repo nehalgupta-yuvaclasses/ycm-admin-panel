@@ -40,10 +40,10 @@ type PlatformState = {
 };
 
 type PaymentState = {
-  provider: "razorpay" | "stripe";
+  provider: "razorpay";
   apiKey: string;
   apiSecret?: string;
-  currency: string;
+  currency: "INR";
   gstRate: number;
   enablePayments: boolean;
 };
@@ -247,9 +247,9 @@ export default function Settings() {
 
       if (paymentData) {
         setPayment({
-          provider: paymentData.provider || DEFAULT_PAYMENT.provider,
+          provider: paymentData.provider === "razorpay" ? "razorpay" : DEFAULT_PAYMENT.provider,
           apiKey: paymentData.api_key || "",
-          currency: paymentData.currency || DEFAULT_PAYMENT.currency,
+          currency: DEFAULT_PAYMENT.currency,
           gstRate: paymentData.gst_rate ?? DEFAULT_PAYMENT.gstRate,
           enablePayments: Boolean(paymentData.is_enabled ?? paymentData.enable_payments),
           apiSecret: "",
@@ -530,10 +530,8 @@ export default function Settings() {
         },
         body: {
           action: "save_payment_settings",
-          provider: values.provider,
           apiKey: values.apiKey,
           apiSecret: values.apiSecret?.trim() || "",
-          currency: values.currency,
           gstRate: values.gstRate,
           isEnabled: values.enablePayments,
         },
@@ -568,7 +566,7 @@ export default function Settings() {
         {
           id: `payment-${Date.now()}`,
           title: "Payment settings saved",
-          detail: `Payment provider updated to ${values.provider}.`,
+          detail: "Payment settings updated.",
           timestamp: new Date().toISOString(),
         },
         ...current,
