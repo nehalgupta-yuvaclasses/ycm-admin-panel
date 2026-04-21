@@ -17,6 +17,24 @@ export interface Course {
   description: string;
   category?: string;
   instructor_id?: string | null;
+  course_type?: 'Live' | 'Recorded' | 'Hybrid';
+  lifecycle_stage?: 'Draft' | 'Review' | 'Published' | 'Archived';
+  access_mode?: 'Open' | 'InviteOnly' | 'Approval';
+  enrollment_mode?: 'SelfEnroll' | 'Manual' | 'Cohort';
+  drip_enabled?: boolean;
+  drip_mode?: 'Immediate' | 'Scheduled' | 'Sequential';
+  drip_interval_days?: number;
+  certificate_enabled?: boolean;
+  certificate_template?: string;
+  analytics_enabled?: boolean;
+  analytics_event_key?: string;
+  brand_color?: string;
+  cover_image_url?: string;
+  publish_at?: string | null;
+  archived_at?: string | null;
+  assessment_mode?: 'None' | 'PerSubject' | 'PerModule' | 'PerLesson';
+    assessment_notes?: string | null;
+  completion_threshold?: number;
   instructor_name?: string;
   buying_price: number;
   selling_price: number;
@@ -32,6 +50,7 @@ export interface Subject {
   id?: string;
   course_id: string;
   name: string;
+  description?: string;
   order?: number;
 }
 
@@ -39,6 +58,7 @@ export interface CurriculumSubject {
   id?: string;
   courseId?: string;
   name: string;
+  description: string;
   order: number;
   modules: CurriculumModule[];
 }
@@ -48,6 +68,9 @@ export interface CurriculumModule {
   subjectId?: string;
   courseId?: string;
   title: string;
+  description: string;
+  moduleType: 'content' | 'assessment' | 'live' | 'resource';
+  dripDaysAfterSubject: number;
   order: number;
   lessons: LessonDraft[];
 }
@@ -56,6 +79,7 @@ type LessonDraft = {
   id: string;
   title: string;
   lessonType: 'recorded' | 'live';
+  contentType: 'recorded' | 'live' | 'document' | 'quiz' | 'assignment';
   videoUrl: string;
   liveUrl: string;
   scheduledAt: string;
@@ -65,6 +89,12 @@ type LessonDraft = {
   liveBy: string;
   notes: string;
   duration: string;
+  resourceUrl: string;
+  isPreview: boolean;
+  unlockAfterDays: number;
+  assessmentTestId?: string;
+  completionRequired: boolean;
+  publishedAt?: string;
   order: number;
 };
 
@@ -93,6 +123,24 @@ type CourseTableRow = {
   description?: string | null;
   category?: string | null;
   instructor_id?: string | null;
+  course_type?: 'Live' | 'Recorded' | 'Hybrid' | null;
+  lifecycle_stage?: 'Draft' | 'Review' | 'Published' | 'Archived' | null;
+  access_mode?: 'Open' | 'InviteOnly' | 'Approval' | null;
+  enrollment_mode?: 'SelfEnroll' | 'Manual' | 'Cohort' | null;
+  drip_enabled?: boolean | null;
+  drip_mode?: 'Immediate' | 'Scheduled' | 'Sequential' | null;
+  drip_interval_days?: number | null;
+  certificate_enabled?: boolean | null;
+  certificate_template?: string | null;
+  analytics_enabled?: boolean | null;
+  analytics_event_key?: string | null;
+  brand_color?: string | null;
+  cover_image_url?: string | null;
+  publish_at?: string | null;
+  archived_at?: string | null;
+  assessment_mode?: 'None' | 'PerSubject' | 'PerModule' | 'PerLesson' | null;
+  assessment_notes?: string | null;
+  completion_threshold?: number | null;
   buying_price?: number | null;
   selling_price?: number | null;
   status?: 'Draft' | 'Published' | string | null;
@@ -130,6 +178,9 @@ type ModuleRow = {
   course_id: string;
   subject_id?: string | null;
   title: string;
+  description?: string | null;
+  module_type?: 'content' | 'assessment' | 'live' | 'resource' | string | null;
+  drip_days_after_subject?: number | null;
   order?: number | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -139,6 +190,7 @@ type SubjectRow = {
   id: string;
   course_id: string;
   name: string;
+  description?: string | null;
   order?: number | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -149,6 +201,7 @@ type LessonRow = {
   module_id: string;
   title: string;
   lesson_type?: string | null;
+  content_type?: string | null;
   video_url?: string | null;
   live_url?: string | null;
   scheduled_at?: string | null;
@@ -158,9 +211,27 @@ type LessonRow = {
   live_by?: string | null;
   notes?: string | null;
   duration?: string | null;
+  resource_url?: string | null;
+  is_preview?: boolean | null;
+  unlock_after_days?: number | null;
+  assessment_test_id?: string | null;
+  completion_required?: boolean | null;
+  published_at?: string | null;
   order?: number | null;
   created_at?: string | null;
   updated_at?: string | null;
+};
+
+type CourseInstructorRow = {
+  course_id: string;
+  instructor_id: string;
+  is_primary?: boolean | null;
+  display_order?: number | null;
+};
+
+type TestRow = {
+  id: string;
+  course_id?: string | null;
 };
 
 type CurriculumBundle = {
@@ -173,6 +244,10 @@ type EnrollmentRow = {
   user_id: string;
   course_id: string;
   progress_percent?: number | null;
+  status?: string | null;
+  payment_status?: string | null;
+  enrolled_at?: string | null;
+  completed_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -188,12 +263,45 @@ function toNumber(value: unknown, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function normalizeCourseType(value?: string | null): 'Live' | 'Recorded' | 'Hybrid' {
+  return value === 'Live' || value === 'Recorded' ? value : 'Hybrid';
+}
+
+function normalizeLifecycleStage(value?: string | null): 'Draft' | 'Review' | 'Published' | 'Archived' {
+  return value === 'Review' || value === 'Published' || value === 'Archived' ? value : 'Draft';
+}
+
+function normalizeAccessMode(value?: string | null): 'Open' | 'InviteOnly' | 'Approval' {
+  return value === 'InviteOnly' || value === 'Approval' ? value : 'Open';
+}
+
+function normalizeEnrollmentMode(value?: string | null): 'SelfEnroll' | 'Manual' | 'Cohort' {
+  return value === 'Manual' || value === 'Cohort' ? value : 'SelfEnroll';
+}
+
+function normalizeDripMode(value?: string | null): 'Immediate' | 'Scheduled' | 'Sequential' {
+  return value === 'Immediate' || value === 'Scheduled' ? value : 'Sequential';
+}
+
+function normalizeAssessmentMode(value?: string | null): 'None' | 'PerSubject' | 'PerModule' | 'PerLesson' {
+  return value === 'None' || value === 'PerModule' || value === 'PerLesson' ? value : 'PerSubject';
+}
+
+function normalizeLessonContentType(value?: string | null): 'recorded' | 'live' | 'document' | 'quiz' | 'assignment' {
+  return value === 'live' || value === 'document' || value === 'quiz' || value === 'assignment' ? value : 'recorded';
+}
+
+function normalizeModuleType(value?: string | null): 'content' | 'assessment' | 'live' | 'resource' {
+  return value === 'assessment' || value === 'live' || value === 'resource' ? value : 'content';
+}
+
 function toLessonRecord(lessonRow: LessonRow): LessonRecord {
   return {
     id: lessonRow.id,
     moduleId: lessonRow.module_id,
     title: lessonRow.title,
     lessonType: lessonRow.lesson_type === 'live' || Boolean(lessonRow.live_url) || Boolean(lessonRow.scheduled_at) ? 'live' : 'recorded',
+    contentType: normalizeLessonContentType(lessonRow.content_type || lessonRow.lesson_type),
     videoUrl: lessonRow.video_url || '',
     liveUrl: lessonRow.live_url || '',
     scheduledAt: lessonRow.scheduled_at || '',
@@ -203,6 +311,12 @@ function toLessonRecord(lessonRow: LessonRow): LessonRecord {
     liveBy: lessonRow.live_by || '',
     notes: lessonRow.notes || '',
     duration: lessonRow.duration || '',
+    resourceUrl: lessonRow.resource_url || '',
+    isPreview: Boolean(lessonRow.is_preview),
+    unlockAfterDays: toNumber(lessonRow.unlock_after_days),
+    assessmentTestId: lessonRow.assessment_test_id || undefined,
+    completionRequired: lessonRow.completion_required ?? true,
+    publishedAt: lessonRow.published_at || undefined,
     order: lessonRow.order || 0,
   };
 }
@@ -264,12 +378,16 @@ function patchLessonInCurriculum(subjects: SubjectRecord[], lesson: LessonRecord
 function normalizeCourse(
   row: CourseTableRow,
   instructorMap: Map<string, InstructorRow>,
+  courseInstructorMap: Map<string, CourseInstructorRow[]>,
   studentsCount = 0,
   subjectsCount = 0,
   modulesCount = 0,
   lessonsCount = 0,
+  testsCount = 0,
 ): CourseSummary {
-  const instructor = row.instructor_id ? instructorMap.get(row.instructor_id) : undefined;
+  const instructorRows = courseInstructorMap.get(row.id) || [];
+  const primaryInstructorId = instructorRows.find((entry) => entry.is_primary)?.instructor_id || row.instructor_id || '';
+  const instructor = primaryInstructorId ? instructorMap.get(primaryInstructorId) : undefined;
   const instructorName = instructor?.full_name || instructor?.email || 'Unassigned';
 
   return {
@@ -278,14 +396,34 @@ function normalizeCourse(
     subtitle: row.subtitle || '',
     description: row.description || '',
     category: row.category || 'General',
-    instructorId: row.instructor_id || '',
+    instructorId: primaryInstructorId,
     instructorName,
+    instructorCount: Math.max(1, instructorRows.length || (row.instructor_id ? 1 : 0)),
+    coInstructorIds: instructorRows.filter((entry) => !entry.is_primary).map((entry) => entry.instructor_id),
     instructorImage: instructor?.profile_image || '',
     instructorBio: instructor?.bio || '',
     instructorExperienceYears: toNumber(instructor?.experience_years),
     thumbnailUrl: row.thumbnail_url || '',
+    coverImageUrl: row.cover_image_url || '',
+    brandColor: row.brand_color || '#111827',
     originalPrice: toNumber(row.buying_price),
     sellingPrice: toNumber(row.selling_price),
+    courseType: normalizeCourseType(row.course_type),
+    lifecycleStage: normalizeLifecycleStage(row.lifecycle_stage),
+    accessMode: normalizeAccessMode(row.access_mode),
+    enrollmentMode: normalizeEnrollmentMode(row.enrollment_mode),
+    dripEnabled: Boolean(row.drip_enabled),
+    dripMode: normalizeDripMode(row.drip_mode),
+    dripIntervalDays: toNumber(row.drip_interval_days, 7),
+    certificateEnabled: Boolean(row.certificate_enabled),
+    certificateTemplate: row.certificate_template || '',
+    assessmentMode: normalizeAssessmentMode(row.assessment_mode),
+    assessmentNotes: row.assessment_notes || '',
+    completionThreshold: toNumber(row.completion_threshold, 80),
+    analyticsEnabled: row.analytics_enabled ?? true,
+    analyticsEventKey: row.analytics_event_key || '',
+    publishAt: row.publish_at || undefined,
+    archivedAt: row.archived_at || undefined,
     status: row.status === 'Published' ? 'Published' : 'Draft',
     visibility: row.visibility === 'Private' ? 'Private' : 'Public',
     studentsCount,
@@ -294,6 +432,7 @@ function normalizeCourse(
     subjectsCount,
     modulesCount,
     lessonsCount,
+    testsCount,
   };
 }
 
@@ -305,6 +444,55 @@ async function fetchInstructorMap() {
   const map = new Map<string, InstructorRow>();
   (data || []).forEach((instructor: InstructorRow) => map.set(instructor.id, instructor));
   return map;
+}
+
+async function fetchCourseInstructorMap() {
+  const { data } = await supabase
+    .from('course_instructors')
+    .select('course_id, instructor_id, is_primary, display_order');
+
+  const map = new Map<string, CourseInstructorRow[]>();
+  (data || []).forEach((row: CourseInstructorRow) => {
+    const current = map.get(row.course_id) || [];
+    current.push(row);
+    map.set(row.course_id, current.sort((left, right) => toNumber(left.display_order) - toNumber(right.display_order)));
+  });
+  return map;
+}
+
+async function syncCourseInstructors(courseId: string, leadInstructorId: string | null | undefined, coInstructorIds: string[] = []) {
+  const uniqueCoInstructorIds = Array.from(new Set(coInstructorIds.filter((instructorId) => instructorId && instructorId !== leadInstructorId)));
+
+  const { error: deleteError } = await supabase
+    .from('course_instructors')
+    .delete()
+    .eq('course_id', courseId);
+
+  if (deleteError) {
+    throw deleteError;
+  }
+
+  const instructorRows = [
+    ...(leadInstructorId
+      ? [{ course_id: courseId, instructor_id: leadInstructorId, role: 'lead', is_primary: true, display_order: 0 }]
+      : []),
+    ...uniqueCoInstructorIds.map((instructorId, index) => ({
+      course_id: courseId,
+      instructor_id: instructorId,
+      role: 'co_instructor',
+      is_primary: false,
+      display_order: index + 1,
+    })),
+  ];
+
+  if (!instructorRows.length) {
+    return;
+  }
+
+  const { error: insertError } = await supabase.from('course_instructors').insert(instructorRows);
+  if (insertError) {
+    throw insertError;
+  }
 }
 
 async function filterAdminLinkedInstructors<T extends { id: string }>(rows: T[]) {
@@ -324,15 +512,19 @@ async function filterAdminLinkedInstructors<T extends { id: string }>(rows: T[])
 }
 
 async function fetchCounts() {
-  const [subjectsRes, modulesRes, lessonsRes] = await Promise.all([
+  const [subjectsRes, modulesRes, lessonsRes, enrollmentsRes, testsRes] = await Promise.all([
     supabase.from('subjects').select('id, course_id'),
     supabase.from('modules').select('id, course_id'),
     supabase.from('lessons').select('id, module_id'),
+    supabase.from('enrollments').select('id, course_id, progress_percent'),
+    supabase.from('tests').select('id, course_id'),
   ]);
 
   const subjectRows = (subjectsRes.data || []) as SubjectRow[];
   const moduleRows = (modulesRes.data || []) as ModuleRow[];
   const lessonRows = (lessonsRes.data || []) as LessonRow[];
+  const enrollmentRows = (enrollmentsRes.data || []) as EnrollmentRow[];
+  const testRows = (testsRes.data || []) as TestRow[];
 
   const subjectCountByCourse = new Map<string, number>();
   subjectRows.forEach((subjectRow) => {
@@ -355,22 +547,40 @@ async function fetchCounts() {
     }
   });
 
+  const enrollmentCountByCourse = new Map<string, number>();
+  const progressByCourse = new Map<string, { total: number; count: number }>();
+  enrollmentRows.forEach((enrollmentRow) => {
+    enrollmentCountByCourse.set(enrollmentRow.course_id, (enrollmentCountByCourse.get(enrollmentRow.course_id) || 0) + 1);
+    const aggregate = progressByCourse.get(enrollmentRow.course_id) || { total: 0, count: 0 };
+    aggregate.total += toNumber(enrollmentRow.progress_percent);
+    aggregate.count += 1;
+    progressByCourse.set(enrollmentRow.course_id, aggregate);
+  });
+
+  const testCountByCourse = new Map<string, number>();
+  testRows.forEach((testRow) => {
+    if (!testRow.course_id) return;
+    testCountByCourse.set(testRow.course_id, (testCountByCourse.get(testRow.course_id) || 0) + 1);
+  });
+
   return {
     subjectCountByCourse,
     moduleCountByCourse,
     lessonCountByCourse,
-    enrollmentCountByCourse: new Map<string, number>(),
-    averageProgressByCourse: new Map<string, number>(),
-    enrollmentRows: [] as EnrollmentRow[],
+    enrollmentCountByCourse,
+    averageProgressByCourse: new Map<string, number>([...progressByCourse.entries()].map(([courseId, aggregate]) => [courseId, aggregate.count ? aggregate.total / aggregate.count : 0])),
+    testCountByCourse,
+    enrollmentRows,
   };
 }
 
 async function getCourseRecords(courseId?: string) {
-  const [courseRes, usersRes, counts] = await Promise.all([
+  const [courseRes, usersRes, courseInstructorsRes, counts] = await Promise.all([
     courseId
       ? supabase.from('courses').select('*').eq('id', courseId).maybeSingle()
       : supabase.from('courses').select('*').order('created_at', { ascending: false }),
     fetchInstructorMap(),
+    fetchCourseInstructorMap(),
     fetchCounts(),
   ]);
 
@@ -384,21 +594,23 @@ async function getCourseRecords(courseId?: string) {
     normalizeCourse(
       row,
       usersRes,
+      courseInstructorsRes,
       counts.enrollmentCountByCourse.get(row.id) || row.students_count || 0,
       counts.subjectCountByCourse.get(row.id) || 0,
       counts.moduleCountByCourse.get(row.id) || 0,
       counts.lessonCountByCourse.get(row.id) || 0,
+      counts.testCountByCourse.get(row.id) || 0,
     ),
   );
 
-  return { courses, counts, instructorMap: usersRes };
+  return { courses, counts, instructorMap: usersRes, courseInstructorMap: courseInstructorsRes };
 }
 
 async function getCourseCurriculum(courseId: string): Promise<CurriculumBundle> {
   const [subjectsRes, modulesRes, lessonsRes] = await Promise.all([
-    supabase.from('subjects').select('id, course_id, name, order, created_at, updated_at').eq('course_id', courseId).order('order', { ascending: true }),
-    supabase.from('modules').select('id, course_id, subject_id, title, order, created_at, updated_at').eq('course_id', courseId).order('order', { ascending: true }),
-    supabase.from('lessons').select('id, module_id, title, lesson_type, video_url, live_url, scheduled_at, is_live, live_started_at, live_ended_at, live_by, notes, duration, order, created_at, updated_at'),
+    supabase.from('subjects').select('id, course_id, name, description, order, created_at, updated_at').eq('course_id', courseId).order('order', { ascending: true }),
+    supabase.from('modules').select('id, course_id, subject_id, title, description, module_type, drip_days_after_subject, order, created_at, updated_at').eq('course_id', courseId).order('order', { ascending: true }),
+    supabase.from('lessons').select('id, module_id, title, lesson_type, content_type, video_url, live_url, scheduled_at, is_live, live_started_at, live_ended_at, live_by, notes, duration, resource_url, is_preview, unlock_after_days, assessment_test_id, completion_required, published_at, order, created_at, updated_at'),
   ]);
 
   const subjectRows = (subjectsRes.data || []) as SubjectRow[];
@@ -424,6 +636,9 @@ async function getCourseCurriculum(courseId: string): Promise<CurriculumBundle> 
       subjectId: moduleRow.subject_id,
       courseId: moduleRow.course_id,
       title: moduleRow.title,
+      description: moduleRow.description || '',
+      moduleType: normalizeModuleType(moduleRow.module_type),
+      dripDaysAfterSubject: toNumber(moduleRow.drip_days_after_subject),
       order: moduleRow.order || 0,
       lessons: (lessonsByModule.get(moduleRow.id) || [])
         .sort((left, right) => toNumber(left.order) - toNumber(right.order))
@@ -436,6 +651,7 @@ async function getCourseCurriculum(courseId: string): Promise<CurriculumBundle> 
     id: subjectRow.id,
     courseId: subjectRow.course_id,
     name: subjectRow.name,
+    description: subjectRow.description || '',
     order: subjectRow.order || 0,
     modules: (modulesBySubject.get(subjectRow.id) || []).sort((left, right) => left.order - right.order),
   })) satisfies SubjectRecord[];
@@ -492,14 +708,14 @@ export const courseService = {
     analytics: CourseAnalytics;
   }> {
     try {
-      const { courses } = await getCourseRecords(courseId);
+      const { courses, counts } = await getCourseRecords(courseId);
       const course = courses[0] || null;
       const curriculum = courseId ? await getCourseCurriculum(courseId) : { subjects: [], modules: [] };
       const subjects = curriculum.subjects;
       const modules = curriculum.modules;
-      const enrollments: EnrollmentRecord[] = [];
-      const revenue = 0;
-      const averageProgress = 0;
+      const enrollments = await this.getEnrollments(courseId);
+      const revenue = course ? enrollments.length * course.sellingPrice : 0;
+      const averageProgress = counts.averageProgressByCourse.get(courseId) || 0;
 
       return {
         course,
@@ -513,6 +729,7 @@ export const courseService = {
           subjects: subjects.length,
           modules: modules.length,
           lessons: modules.reduce((acc, moduleRecord) => acc + moduleRecord.lessons.length, 0),
+          tests: counts.testCountByCourse.get(courseId) || 0,
         },
       };
     } catch (err) {
@@ -522,7 +739,7 @@ export const courseService = {
         subjects: [],
         modules: [],
         enrollments: [],
-        analytics: { enrollments: 0, revenue: 0, completionRate: 0, subjects: 0, modules: 0, lessons: 0 },
+        analytics: { enrollments: 0, revenue: 0, completionRate: 0, subjects: 0, modules: 0, lessons: 0, tests: 0 },
       };
     }
   },
@@ -538,6 +755,24 @@ export const courseService = {
             description: course.description,
             category: course.category,
             instructor_id: course.instructorId || null,
+            course_type: course.courseType,
+            lifecycle_stage: course.lifecycleStage,
+            access_mode: course.accessMode,
+            enrollment_mode: course.enrollmentMode,
+            drip_enabled: course.dripEnabled,
+            drip_mode: course.dripMode,
+            drip_interval_days: course.dripIntervalDays,
+            certificate_enabled: course.certificateEnabled,
+            certificate_template: course.certificateTemplate || null,
+            analytics_enabled: course.analyticsEnabled,
+            analytics_event_key: course.analyticsEventKey || null,
+            brand_color: course.brandColor,
+            cover_image_url: course.coverImageUrl || null,
+            publish_at: course.publishAt || null,
+            archived_at: course.archivedAt || null,
+            assessment_mode: course.assessmentMode,
+            assessment_notes: course.assessmentNotes || null,
+            completion_threshold: course.completionThreshold,
             thumbnail_url: course.thumbnailUrl || null,
             buying_price: course.originalPrice,
             selling_price: course.sellingPrice,
@@ -555,58 +790,83 @@ export const courseService = {
       }
 
       const courseId = data.id;
-      const { data: generalSubject, error: subjectError } = await supabase
-        .from('subjects')
-        .insert([{ course_id: courseId, name: 'General', order: 0 }])
-        .select('id')
-        .single();
+      await syncCourseInstructors(courseId, course.instructorId || null, course.coInstructorIds || []);
 
-      if (subjectError) {
-        throw subjectError;
+      if (!course.subjects.length) {
+        throw new Error('At least one subject is required.');
       }
 
-      for (const moduleDraft of course.modules) {
-        const { data: moduleData, error: moduleError } = await supabase
-          .from('modules')
+      for (const subjectDraft of course.subjects) {
+        const { data: subjectData, error: subjectError } = await supabase
+          .from('subjects')
           .insert([
             {
               course_id: courseId,
-              subject_id: generalSubject.id,
-              title: moduleDraft.title,
-              order: moduleDraft.order,
+              name: subjectDraft.name,
+              description: subjectDraft.description || null,
+              order: subjectDraft.order,
             },
           ])
-          .select()
+          .select('id')
           .single();
 
-        if (moduleError) {
-          throw moduleError;
+        if (subjectError) {
+          throw subjectError;
         }
 
-        for (const lessonDraft of moduleDraft.lessons) {
-          const lessonType = lessonDraft.lessonType === 'live' ? 'live' : 'recorded';
-          const { error: lessonError } = await supabase
-            .from('lessons')
+        for (const moduleDraft of subjectDraft.modules) {
+          const { data: moduleData, error: moduleError } = await supabase
+            .from('modules')
             .insert([
               {
-                module_id: moduleData.id,
-                title: lessonDraft.title,
-                lesson_type: lessonType,
-                video_url: lessonType === 'recorded' ? lessonDraft.videoUrl || null : null,
-                live_url: lessonType === 'live' ? lessonDraft.liveUrl || null : null,
-                scheduled_at: lessonType === 'live' ? lessonDraft.scheduledAt || null : null,
-                is_live: Boolean(lessonDraft.isLive),
-                live_started_at: lessonDraft.liveStartedAt || null,
-                live_ended_at: lessonDraft.liveEndedAt || null,
-                live_by: lessonDraft.liveBy || null,
-                notes: lessonDraft.notes || null,
-                duration: lessonDraft.duration || null,
-                order: lessonDraft.order,
+                course_id: courseId,
+                subject_id: subjectData.id,
+                title: moduleDraft.title,
+                description: moduleDraft.description || null,
+                module_type: moduleDraft.moduleType,
+                drip_days_after_subject: moduleDraft.dripDaysAfterSubject,
+                order: moduleDraft.order,
               },
-            ]);
+            ])
+            .select('id')
+            .single();
 
-          if (lessonError) {
-            throw lessonError;
+          if (moduleError) {
+            throw moduleError;
+          }
+
+          for (const lessonDraft of moduleDraft.lessons) {
+            const lessonType = lessonDraft.lessonType === 'live' ? 'live' : 'recorded';
+            const { error: lessonError } = await supabase
+              .from('lessons')
+              .insert([
+                {
+                  module_id: moduleData.id,
+                  title: lessonDraft.title,
+                  lesson_type: lessonType,
+                  content_type: lessonDraft.contentType || lessonType,
+                  video_url: lessonType === 'recorded' ? lessonDraft.videoUrl || null : null,
+                  live_url: lessonType === 'live' ? lessonDraft.liveUrl || null : null,
+                  scheduled_at: lessonType === 'live' ? lessonDraft.scheduledAt || null : null,
+                  is_live: Boolean(lessonDraft.isLive),
+                  live_started_at: lessonDraft.liveStartedAt || null,
+                  live_ended_at: lessonDraft.liveEndedAt || null,
+                  live_by: lessonDraft.liveBy || null,
+                  notes: lessonDraft.notes || null,
+                  duration: lessonDraft.duration || null,
+                  resource_url: lessonDraft.resourceUrl || null,
+                  is_preview: Boolean(lessonDraft.isPreview),
+                  unlock_after_days: lessonDraft.unlockAfterDays,
+                  assessment_test_id: lessonDraft.assessmentTestId || null,
+                  completion_required: lessonDraft.completionRequired,
+                  published_at: lessonDraft.publishedAt || null,
+                  order: lessonDraft.order,
+                },
+              ]);
+
+            if (lessonError) {
+              throw lessonError;
+            }
           }
         }
       }
@@ -618,11 +878,12 @@ export const courseService = {
     }
   },
 
-  async updateCourse(id: string, updates: Partial<Course>) {
+  async updateCourse(id: string, updates: Partial<Course> & { coInstructorIds?: string[] }) {
     try {
+      const { coInstructorIds, ...courseUpdates } = updates;
       const { data, error } = await supabase
         .from('courses')
-        .update({ ...updates, updated_at: new Date().toISOString() })
+        .update({ ...courseUpdates, updated_at: new Date().toISOString() })
         .eq('id', id)
         .select()
         .single();
@@ -631,6 +892,11 @@ export const courseService = {
         console.error('updateCourse error:', error);
         throw error;
       }
+
+      if (updates.instructor_id !== undefined || coInstructorIds !== undefined) {
+        await syncCourseInstructors(id, updates.instructor_id ?? data.instructor_id ?? null, coInstructorIds || []);
+      }
+
       return data;
     } catch (err) {
       console.error('updateCourse exception:', err);
@@ -671,6 +937,7 @@ export const courseService = {
               id: subjectId,
               course_id: courseId,
               name: subjectRecord.name,
+              description: subjectRecord.description || null,
               order: subjectRecord.order,
               updated_at: new Date().toISOString(),
             },
@@ -695,6 +962,9 @@ export const courseService = {
                 course_id: courseId,
                 subject_id: savedSubject.id,
                 title: moduleRecord.title,
+                description: moduleRecord.description || null,
+                module_type: moduleRecord.moduleType,
+                drip_days_after_subject: moduleRecord.dripDaysAfterSubject,
                 order: moduleRecord.order,
                 updated_at: new Date().toISOString(),
               },
@@ -719,6 +989,7 @@ export const courseService = {
                   module_id: savedModule.id,
                   title: lesson.title,
                   lesson_type: lessonType,
+                  content_type: lesson.contentType || lessonType,
                   video_url: lessonType === 'recorded' ? lesson.videoUrl || null : null,
                   live_url: lessonType === 'live' ? lesson.liveUrl || null : null,
                   scheduled_at: lessonType === 'live' ? lesson.scheduledAt || null : null,
@@ -728,6 +999,12 @@ export const courseService = {
                   live_by: lesson.liveBy || null,
                   notes: lesson.notes || null,
                   duration: lesson.duration || null,
+                  resource_url: lesson.resourceUrl || null,
+                  is_preview: Boolean(lesson.isPreview),
+                  unlock_after_days: lesson.unlockAfterDays,
+                  assessment_test_id: lesson.assessmentTestId || null,
+                  completion_required: lesson.completionRequired,
+                  published_at: lesson.publishedAt || null,
                   order: lesson.order,
                   updated_at: new Date().toISOString(),
                 },
@@ -775,7 +1052,7 @@ export const courseService = {
     try {
       const { data, error } = await supabase
         .from('subjects')
-        .select('id, course_id, name, order')
+        .select('id, course_id, name, description, order')
         .eq('course_id', courseId)
         .order('order', { ascending: true });
 
@@ -892,11 +1169,17 @@ export const courseService = {
             module_id: lecture.subject_id,
             title: lecture.title,
             lesson_type: lessonType,
+            content_type: lessonType,
             video_url: lessonType === 'recorded' ? lecture.video_url || null : null,
             live_url: lessonType === 'live' ? lecture.live_url || lecture.meeting_link || null : null,
             scheduled_at: lessonType === 'live' ? lecture.scheduled_at || null : null,
             duration: lecture.duration || null,
             notes: '',
+            resource_url: null,
+            is_preview: false,
+            unlock_after_days: 0,
+            assessment_test_id: null,
+            completion_required: true,
             order: lecture.order || 0,
           },
         ])
@@ -934,6 +1217,7 @@ export const courseService = {
         .update({
           title: updates.title,
           lesson_type: lessonType,
+          content_type: lessonType,
           video_url: lessonType === 'recorded' ? updates.video_url ?? current?.video_url ?? null : null,
           live_url: isLiveLesson ? updates.live_url ?? updates.meeting_link ?? current?.live_url ?? null : null,
           scheduled_at: isLiveLesson ? updates.scheduled_at ?? current?.scheduled_at ?? null : null,
@@ -943,6 +1227,11 @@ export const courseService = {
           live_by: isLiveLesson ? updates.live_by ?? current?.live_by ?? null : null,
           duration: updates.duration ?? current?.duration ?? null,
           notes: updates.notes ?? current?.notes ?? '',
+          resource_url: updates.resource_url ?? current?.resource_url ?? null,
+          is_preview: updates.is_preview ?? current?.is_preview ?? false,
+          unlock_after_days: updates.unlock_after_days ?? current?.unlock_after_days ?? 0,
+          assessment_test_id: updates.assessment_test_id ?? current?.assessment_test_id ?? null,
+          completion_required: updates.completion_required ?? current?.completion_required ?? true,
           order: updates.order ?? current?.order ?? 0,
           updated_at: new Date().toISOString(),
         })
@@ -1008,7 +1297,7 @@ export const courseService = {
         updated_at: new Date().toISOString(),
       })
       .eq('id', lessonId)
-      .select('id, module_id, title, lesson_type, video_url, live_url, scheduled_at, is_live, live_started_at, live_ended_at, live_by, notes, duration, order, created_at, updated_at')
+      .select('id, module_id, title, lesson_type, content_type, video_url, live_url, scheduled_at, is_live, live_started_at, live_ended_at, live_by, notes, duration, resource_url, is_preview, unlock_after_days, assessment_test_id, completion_required, published_at, order, created_at, updated_at')
       .single();
 
     if (error) {
@@ -1046,7 +1335,7 @@ export const courseService = {
         updated_at: new Date().toISOString(),
       })
       .eq('id', lessonId)
-      .select('id, module_id, title, lesson_type, video_url, live_url, scheduled_at, is_live, live_started_at, live_ended_at, live_by, notes, duration, order, created_at, updated_at')
+      .select('id, module_id, title, lesson_type, content_type, video_url, live_url, scheduled_at, is_live, live_started_at, live_ended_at, live_by, notes, duration, resource_url, is_preview, unlock_after_days, assessment_test_id, completion_required, published_at, order, created_at, updated_at')
       .single();
 
     if (error) {

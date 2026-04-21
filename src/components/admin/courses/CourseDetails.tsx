@@ -73,6 +73,8 @@ export function CourseDetails({
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl font-semibold tracking-tight">{course.title}</h1>
+                  <Badge variant="outline" className="rounded-md border-border/60 px-2 py-0.5 text-xs">{course.courseType}</Badge>
+                  <Badge variant="outline" className="rounded-md border-border/60 px-2 py-0.5 text-xs">{course.lifecycleStage}</Badge>
                   <Badge variant="outline" className="rounded-md border-border/60 px-2 py-0.5 text-xs">{course.status}</Badge>
                   <Badge variant="outline" className="rounded-md border-border/60 px-2 py-0.5 text-xs">{course.visibility}</Badge>
                 </div>
@@ -81,6 +83,8 @@ export function CourseDetails({
                   <span>{course.category}</span>
                   <span>•</span>
                   <span>{course.instructorName}</span>
+                  <span>•</span>
+                  <span>{course.instructorCount} instructors</span>
                   <span>•</span>
                   <span>{course.studentsCount} students</span>
                   <span>•</span>
@@ -120,10 +124,17 @@ export function CourseDetails({
             </Card>
             <Card className="rounded-xl border-border/60">
               <CardHeader className="pb-2">
-                <CardDescription>Status</CardDescription>
-                <CardTitle className="text-2xl">{course.status}</CardTitle>
+                <CardDescription>Delivery</CardDescription>
+                <CardTitle className="text-2xl">{course.courseType}</CardTitle>
               </CardHeader>
-              <CardContent className="text-sm text-muted-foreground">Visibility: {course.visibility}</CardContent>
+              <CardContent className="text-sm text-muted-foreground">{course.enrollmentMode} enrollment and {course.accessMode} access</CardContent>
+            </Card>
+            <Card className="rounded-xl border-border/60">
+              <CardHeader className="pb-2">
+                <CardDescription>Lifecycle</CardDescription>
+                <CardTitle className="text-2xl">{course.lifecycleStage}</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">{course.status} publication state</CardContent>
             </Card>
             <Card className="rounded-xl border-border/60">
               <CardHeader className="pb-2">
@@ -141,10 +152,10 @@ export function CourseDetails({
             </Card>
             <Card className="rounded-xl border-border/60">
               <CardHeader className="pb-2">
-                <CardDescription>Live lessons</CardDescription>
-                <CardTitle className="text-2xl">{liveLessons}</CardTitle>
+                <CardDescription>Assessments</CardDescription>
+                <CardTitle className="text-2xl">{analytics.tests}</CardTitle>
               </CardHeader>
-              <CardContent className="text-sm text-muted-foreground">Lessons currently marked live</CardContent>
+              <CardContent className="text-sm text-muted-foreground">Linked tests across the course tree</CardContent>
             </Card>
           </div>
 
@@ -157,6 +168,12 @@ export function CourseDetails({
               <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
                 <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Description</div>
                 <div className="mt-2 text-sm leading-6 text-muted-foreground">{course.description}</div>
+              </div>
+              <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Delivery rules</div>
+                <div className="mt-2 text-sm leading-6 text-muted-foreground">
+                  {course.courseType} course with {course.accessMode} access and {course.enrollmentMode} enrollment.
+                </div>
               </div>
               <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
                 <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Instructor</div>
@@ -177,8 +194,28 @@ export function CourseDetails({
                 </div>
               </div>
               <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Instruction model</div>
+                <div className="mt-2 text-sm leading-6 text-muted-foreground">
+                  {course.instructorCount > 1 ? `${course.instructorCount} instructors are attached to this course.` : 'Single lead instructor.'}
+                </div>
+              </div>
+              <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
                 <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Category</div>
                 <div className="mt-2 text-sm font-medium">{course.category}</div>
+              </div>
+              <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Assessment policy</div>
+                <div className="mt-2 text-sm font-medium">{course.assessmentMode}</div>
+                <div className="mt-1 text-sm text-muted-foreground">Threshold {Math.round(course.completionThreshold)}%</div>
+              </div>
+              <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Drip content</div>
+                <div className="mt-2 text-sm font-medium">{course.dripEnabled ? `${course.dripMode} every ${course.dripIntervalDays} days` : 'Disabled'}</div>
+              </div>
+              <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Certificates</div>
+                <div className="mt-2 text-sm font-medium">{course.certificateEnabled ? 'Enabled' : 'Disabled'}</div>
+                {course.certificateTemplate ? <div className="mt-1 text-sm text-muted-foreground">{course.certificateTemplate}</div> : null}
               </div>
               <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
                 <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Updated</div>
@@ -256,6 +293,13 @@ export function CourseDetails({
                 <CardTitle className="text-2xl">{Math.round(analytics.completionRate)}%</CardTitle>
               </CardHeader>
               <CardContent className="flex items-center gap-2 text-sm text-muted-foreground"><BarChart3 className="h-4 w-4" /> Based on enrolled progress data</CardContent>
+            </Card>
+            <Card className="rounded-xl border-border/60">
+              <CardHeader className="pb-2">
+                <CardDescription>Tests</CardDescription>
+                <CardTitle className="text-2xl">{analytics.tests}</CardTitle>
+              </CardHeader>
+              <CardContent className="flex items-center gap-2 text-sm text-muted-foreground"><BookOpen className="h-4 w-4" /> Assessment coverage across the course</CardContent>
             </Card>
           </div>
 

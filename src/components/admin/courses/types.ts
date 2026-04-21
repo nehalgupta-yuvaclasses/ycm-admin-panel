@@ -1,4 +1,10 @@
 export type CourseStatus = "Draft" | "Published";
+export type CourseLifecycleStage = "Draft" | "Review" | "Published" | "Archived";
+export type CourseType = "Live" | "Recorded" | "Hybrid";
+export type CourseAccessMode = "Open" | "InviteOnly" | "Approval";
+export type CourseEnrollmentMode = "SelfEnroll" | "Manual" | "Cohort";
+export type CourseDripMode = "Immediate" | "Scheduled" | "Sequential";
+export type CourseAssessmentMode = "None" | "PerSubject" | "PerModule" | "PerLesson";
 export type CourseVisibility = "Public" | "Private";
 export type CourseSort = "newest" | "popular";
 
@@ -15,6 +21,7 @@ export interface LessonDraft {
   id: string;
   title: string;
   lessonType: "recorded" | "live";
+  contentType: "recorded" | "live" | "document" | "quiz" | "assignment";
   videoUrl: string;
   liveUrl: string;
   scheduledAt: string;
@@ -24,14 +31,28 @@ export interface LessonDraft {
   liveBy: string;
   notes: string;
   duration: string;
+  resourceUrl: string;
+  isPreview: boolean;
+  unlockAfterDays: number;
   order: number;
 }
 
 export interface ModuleDraft {
   id: string;
   title: string;
+  description: string;
+  moduleType: "content" | "assessment" | "live" | "resource";
+  dripDaysAfterSubject: number;
   order: number;
   lessons: LessonDraft[];
+}
+
+export interface SubjectDraft {
+  id: string;
+  name: string;
+  description: string;
+  order: number;
+  modules: ModuleDraft[];
 }
 
 export interface CourseFormValues {
@@ -40,12 +61,31 @@ export interface CourseFormValues {
   description: string;
   category: string;
   instructorId: string;
+  coInstructorIds: string[];
+  courseType: CourseType;
+  lifecycleStage: CourseLifecycleStage;
+  accessMode: CourseAccessMode;
+  enrollmentMode: CourseEnrollmentMode;
   thumbnailUrl: string;
+  coverImageUrl: string;
+  brandColor: string;
   originalPrice: number;
   sellingPrice: number;
+  dripEnabled: boolean;
+  dripMode: CourseDripMode;
+  dripIntervalDays: number;
+  certificateEnabled: boolean;
+  certificateTemplate: string;
+  assessmentMode: CourseAssessmentMode;
+  assessmentNotes: string;
+  completionThreshold: number;
+  analyticsEnabled: boolean;
+  analyticsEventKey: string;
+  publishAt: string;
+  archivedAt: string;
   status: CourseStatus;
   visibility: CourseVisibility;
-  modules: ModuleDraft[];
+  subjects: SubjectDraft[];
 }
 
 export interface CourseSummary {
@@ -56,12 +96,32 @@ export interface CourseSummary {
   category: string;
   instructorId: string;
   instructorName: string;
+  instructorCount: number;
+  coInstructorIds: string[];
   instructorImage?: string;
   instructorBio?: string;
   instructorExperienceYears?: number;
   thumbnailUrl: string;
+  coverImageUrl: string;
+  brandColor: string;
   originalPrice: number;
   sellingPrice: number;
+  courseType: CourseType;
+  lifecycleStage: CourseLifecycleStage;
+  accessMode: CourseAccessMode;
+  enrollmentMode: CourseEnrollmentMode;
+  dripEnabled: boolean;
+  dripMode: CourseDripMode;
+  dripIntervalDays: number;
+  certificateEnabled: boolean;
+  certificateTemplate: string;
+  assessmentMode: CourseAssessmentMode;
+  assessmentNotes: string;
+  completionThreshold: number;
+  analyticsEnabled: boolean;
+  analyticsEventKey: string;
+  publishAt?: string;
+  archivedAt?: string;
   status: CourseStatus;
   visibility: CourseVisibility;
   studentsCount: number;
@@ -70,6 +130,7 @@ export interface CourseSummary {
   subjectsCount: number;
   modulesCount: number;
   lessonsCount: number;
+  testsCount: number;
 }
 
 export interface LessonRecord {
@@ -77,6 +138,7 @@ export interface LessonRecord {
   moduleId: string;
   title: string;
   lessonType: "recorded" | "live";
+  contentType: "recorded" | "live" | "document" | "quiz" | "assignment";
   videoUrl: string;
   liveUrl: string;
   scheduledAt: string;
@@ -86,6 +148,12 @@ export interface LessonRecord {
   liveBy: string;
   notes: string;
   duration: string;
+  resourceUrl: string;
+  isPreview: boolean;
+  unlockAfterDays: number;
+  assessmentTestId?: string;
+  completionRequired: boolean;
+  publishedAt?: string;
   order: number;
 }
 
@@ -94,6 +162,9 @@ export interface ModuleRecord {
   subjectId: string;
   courseId: string;
   title: string;
+  description: string;
+  moduleType: "content" | "assessment" | "live" | "resource";
+  dripDaysAfterSubject: number;
   order: number;
   lessons: LessonRecord[];
 }
@@ -102,6 +173,7 @@ export interface SubjectRecord {
   id: string;
   courseId: string;
   name: string;
+  description: string;
   order: number;
   modules: ModuleRecord[];
 }
@@ -123,6 +195,7 @@ export interface CourseAnalytics {
   subjects: number;
   modules: number;
   lessons: number;
+  tests: number;
 }
 
 export interface CourseDetailsData {
