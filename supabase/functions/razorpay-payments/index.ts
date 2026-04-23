@@ -46,7 +46,8 @@ type RequestActor = {
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -77,10 +78,16 @@ function decodeJwtPayload(token: string) {
 
   try {
     const normalized = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
+    const padded = normalized.padEnd(
+      normalized.length + ((4 - (normalized.length % 4)) % 4),
+      "=",
+    );
     const asciiString = atob(padded);
     const utf8String = decodeURIComponent(
-      asciiString.split("").map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join("")
+      asciiString
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join(""),
     );
     return JSON.parse(utf8String);
   } catch (err) {
@@ -109,7 +116,7 @@ async function getRequestActor(
   request: Request,
   serviceClient: ReturnType<typeof getSupabaseClients>["serviceClient"],
   authClient: ReturnType<typeof getSupabaseClients>["authClient"],
-  debugLog?: any
+  debugLog?: any,
 ): Promise<RequestActor | null> {
   const authHeader = request.headers.get("Authorization");
   if (!authHeader) {
@@ -124,12 +131,15 @@ async function getRequestActor(
   }
 
   // Use Supabase's proper auth verification to get the user
-  console.log("Attempting auth verification with token prefix:", token.substring(0, 20) + "...");
-  
+  console.log(
+    "Attempting auth verification with token prefix:",
+    token.substring(0, 20) + "...",
+  );
+
   // Try authClient first, then fallback to serviceClient
   let supabaseUser = null;
   let authError = null;
-  
+
   // Try with authClient (anon key)
   let result = await authClient.auth.getUser(token);
   if (result.data?.user) {
@@ -137,7 +147,10 @@ async function getRequestActor(
   } else if (result.error) {
     authError = result.error;
     // Try with serviceClient as fallback
-    console.log("Auth client failed, trying serviceClient:", result.error.message);
+    console.log(
+      "Auth client failed, trying serviceClient:",
+      result.error.message,
+    );
     result = await serviceClient.auth.getUser(token);
     if (result.data?.user) {
       supabaseUser = result.data.user;
@@ -146,9 +159,14 @@ async function getRequestActor(
       authError = result.error;
     }
   }
-  
-  console.log("Auth result - user:", supabaseUser?.id, "error:", authError?.message);
-  
+
+  console.log(
+    "Auth result - user:",
+    supabaseUser?.id,
+    "error:",
+    authError?.message,
+  );
+
   if (authError) {
     if (debugLog) debugLog.authError = authError.message;
     console.log("Auth error:", authError.message);
@@ -157,7 +175,7 @@ async function getRequestActor(
   if (supabaseUser) {
     const userId = supabaseUser.id;
     console.log("Verified user ID:", userId);
-    
+
     try {
       // First, try to get the role from the users table
       const { data: userRow, error: userError } = await serviceClient
@@ -169,7 +187,9 @@ async function getRequestActor(
       if (!userError && userRow) {
         return {
           id: String(userRow.id),
-          role: String(userRow.role ?? supabaseUser.user_metadata?.role ?? "student"),
+          role: String(
+            userRow.role ?? supabaseUser.user_metadata?.role ?? "student",
+          ),
           provider: "supabase",
         };
       }
@@ -192,12 +212,17 @@ async function getRequestActor(
   } else {
     // Supabase auth failed - try manual JWT decode
     console.log("Supabase auth failed, trying manual JWT decode");
-    
+
     const decoded = decodeJwtPayload(token);
     const subject = String(decoded?.sub ?? "").trim();
-    
-    console.log("Decoded JWT - subject:", subject, "role:", decoded?.user_metadata?.role);
-    
+
+    console.log(
+      "Decoded JWT - subject:",
+      subject,
+      "role:",
+      decoded?.user_metadata?.role,
+    );
+
     if (subject) {
       // First try Supabase users table
       try {
@@ -210,14 +235,16 @@ async function getRequestActor(
         if (!userError && userRow) {
           return {
             id: String(userRow.id),
-            role: String(userRow.role ?? decoded?.user_metadata?.role ?? "student"),
+            role: String(
+              userRow.role ?? decoded?.user_metadata?.role ?? "student",
+            ),
             provider: "supabase",
           };
         }
       } catch (e) {
         console.log("Users table lookup failed:", e);
       }
-      
+
       // Check JWT metadata for role
       const roleFromJwt = decoded?.user_metadata?.role;
       if (roleFromJwt) {
@@ -227,12 +254,19 @@ async function getRequestActor(
           provider: "supabase",
         };
       }
-      
+
       // Try Firebase
-      const firebaseProjectId = Deno.env.get("FIREBASE_PROJECT_ID") ?? Deno.env.get("VITE_FIREBASE_PROJECT_ID") ?? "";
+      const firebaseProjectId =
+        Deno.env.get("FIREBASE_PROJECT_ID") ??
+        Deno.env.get("VITE_FIREBASE_PROJECT_ID") ??
+        "";
       if (firebaseProjectId) {
         try {
-          const jwks = createRemoteJWKSet(new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"));
+          const jwks = createRemoteJWKSet(
+            new URL(
+              "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com",
+            ),
+          );
           const verified = await jwtVerify(token, jwks, {
             issuer: `https://securetoken.google.com/${firebaseProjectId}`,
             audience: firebaseProjectId,
@@ -265,17 +299,21 @@ async function getRequestActor(
         }
       }
     }
-    
+
     if (debugLog) debugLog.noSupabaseUser = true;
   }
 
   return null;
 }
 
-async function loadPaymentSettings(serviceClient: ReturnType<typeof getSupabaseClients>["serviceClient"]): Promise<PaymentSettingsRow | null> {
+async function loadPaymentSettings(
+  serviceClient: ReturnType<typeof getSupabaseClients>["serviceClient"],
+): Promise<PaymentSettingsRow | null> {
   const { data, error } = await serviceClient
     .from("payment_settings")
-    .select("id, provider, api_key, currency, gst_rate, enable_payments, is_enabled")
+    .select(
+      "id, provider, api_key, currency, gst_rate, enable_payments, is_enabled",
+    )
     .eq("id", 1)
     .maybeSingle();
 
@@ -340,7 +378,11 @@ async function hmacSha256Hex(secret: string, payload: string) {
     ["sign"],
   );
 
-  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(payload));
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(payload),
+  );
   return Array.from(new Uint8Array(signature))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
@@ -353,7 +395,10 @@ function getExpectedAmount(course: CourseRow, gstRate: number) {
   return { baseAmount, gstAmount, totalAmount };
 }
 
-async function createRazorpayOrder(request: Request, payload: Record<string, unknown>) {
+async function createRazorpayOrder(
+  request: Request,
+  payload: Record<string, unknown>,
+) {
   const { serviceClient, authClient } = getSupabaseClients();
   const actor = await getRequestActor(request, serviceClient, authClient);
 
@@ -362,7 +407,8 @@ async function createRazorpayOrder(request: Request, payload: Record<string, unk
   }
 
   const courseId = String(payload.courseId ?? "").trim();
-  const requestedAmount = payload.amount == null ? null : toNumber(payload.amount);
+  const requestedAmount =
+    payload.amount == null ? null : toNumber(payload.amount);
 
   if (!courseId) {
     return json(400, { error: "courseId is required" });
@@ -387,8 +433,14 @@ async function createRazorpayOrder(request: Request, payload: Record<string, unk
     return json(404, { error: "Course not found" });
   }
 
-  const expected = getExpectedAmount(course as CourseRow, toNumber(settings.gst_rate));
-  if (requestedAmount != null && Math.abs(requestedAmount - expected.totalAmount) > 0.01) {
+  const expected = getExpectedAmount(
+    course as CourseRow,
+    toNumber(settings.gst_rate),
+  );
+  if (
+    requestedAmount != null &&
+    Math.abs(requestedAmount - expected.totalAmount) > 0.01
+  ) {
     return json(400, {
       error: "Amount mismatch",
       expectedAmount: expected.totalAmount,
@@ -443,10 +495,13 @@ async function createRazorpayOrder(request: Request, payload: Record<string, unk
       provider: settings.provider,
       gstAmount: expected.gstAmount,
       status: "pending",
-      source: "web",
+      source: (payload.source as string | undefined) ?? "web",
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to persist payment order";
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Unable to persist payment order";
     return json(500, { error: message });
   }
 
@@ -461,7 +516,10 @@ async function createRazorpayOrder(request: Request, payload: Record<string, unk
   });
 }
 
-async function verifyPayment(request: Request, payload: Record<string, unknown>) {
+async function verifyPayment(
+  request: Request,
+  payload: Record<string, unknown>,
+) {
   const { serviceClient, authClient } = getSupabaseClients();
   const actor = await getRequestActor(request, serviceClient, authClient);
 
@@ -469,9 +527,15 @@ async function verifyPayment(request: Request, payload: Record<string, unknown>)
     return json(401, { error: "Authentication required" });
   }
 
-  const razorpayPaymentId = String(payload.razorpay_payment_id ?? payload.paymentId ?? "").trim();
-  const razorpayOrderId = String(payload.razorpay_order_id ?? payload.orderId ?? "").trim();
-  const razorpaySignature = String(payload.razorpay_signature ?? payload.signature ?? "").trim();
+  const razorpayPaymentId = String(
+    payload.razorpay_payment_id ?? payload.paymentId ?? "",
+  ).trim();
+  const razorpayOrderId = String(
+    payload.razorpay_order_id ?? payload.orderId ?? "",
+  ).trim();
+  const razorpaySignature = String(
+    payload.razorpay_signature ?? payload.signature ?? "",
+  ).trim();
 
   if (!razorpayPaymentId || !razorpayOrderId || !razorpaySignature) {
     return json(400, { error: "Missing payment verification fields" });
@@ -485,7 +549,9 @@ async function verifyPayment(request: Request, payload: Record<string, unknown>)
 
   const { data: paymentRow, error: paymentFetchError } = await serviceClient
     .from("payments")
-    .select("id, user_id, course_id, order_id, payment_id, amount, status, provider, currency, gst_amount")
+    .select(
+      "id, user_id, course_id, order_id, payment_id, amount, status, provider, currency, gst_amount",
+    )
     .eq("order_id", razorpayOrderId)
     .maybeSingle();
 
@@ -502,7 +568,10 @@ async function verifyPayment(request: Request, payload: Record<string, unknown>)
     return json(403, { error: "You cannot verify this payment" });
   }
 
-  const expectedSignature = await hmacSha256Hex(secret, `${razorpayOrderId}|${razorpayPaymentId}`);
+  const expectedSignature = await hmacSha256Hex(
+    secret,
+    `${razorpayOrderId}|${razorpayPaymentId}`,
+  );
   if (expectedSignature !== razorpaySignature) {
     try {
       await syncRazorpayPayment(serviceClient, {
@@ -516,10 +585,13 @@ async function verifyPayment(request: Request, payload: Record<string, unknown>)
         provider: row.provider ?? settings?.provider ?? "razorpay",
         gstAmount: toNumber(row.gst_amount ?? 0),
         status: "failed",
-        source: "web",
+        source: (payload.source as string | undefined) ?? "web",
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to mark payment as failed";
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to mark payment as failed";
       return json(500, { error: message });
     }
 
@@ -539,11 +611,12 @@ async function verifyPayment(request: Request, payload: Record<string, unknown>)
       provider: row.provider ?? settings?.provider ?? "razorpay",
       gstAmount: toNumber(row.gst_amount ?? 0),
       status: "success",
-      source: "web",
+      source: (payload.source as string | undefined) ?? "web",
       verifiedAt: new Date().toISOString(),
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to finalize payment";
+    const message =
+      error instanceof Error ? error.message : "Unable to finalize payment";
     return json(500, { error: message });
   }
 
@@ -556,13 +629,27 @@ async function verifyPayment(request: Request, payload: Record<string, unknown>)
   });
 }
 
-async function savePaymentSettings(request: Request, payload: Record<string, unknown>) {
+async function savePaymentSettings(
+  request: Request,
+  payload: Record<string, unknown>,
+) {
   const { serviceClient, authClient } = getSupabaseClients();
-  const adminCheckLog: any = { supabaseProviderFailed: false, fallbackFailed: false };
-  const actor = await getRequestActor(request, serviceClient, authClient, adminCheckLog);
+  const adminCheckLog: any = {
+    supabaseProviderFailed: false,
+    fallbackFailed: false,
+  };
+  const actor = await getRequestActor(
+    request,
+    serviceClient,
+    authClient,
+    adminCheckLog,
+  );
 
   if (!actor) {
-    return json(401, { error: "Authentication required", debug: adminCheckLog });
+    return json(401, {
+      error: "Authentication required",
+      debug: adminCheckLog,
+    });
   }
 
   if (actor.role !== "admin") {
@@ -573,7 +660,12 @@ async function savePaymentSettings(request: Request, payload: Record<string, unk
   const apiKey = String(payload.apiKey ?? payload.api_key ?? "").trim();
   const currency = String(payload.currency ?? "INR").trim() || "INR";
   const gstRate = toNumber(payload.gstRate ?? payload.gst_rate ?? 18);
-  const isEnabled = Boolean(payload.isEnabled ?? payload.enablePayments ?? payload.enable_payments ?? true);
+  const isEnabled = Boolean(
+    payload.isEnabled ??
+    payload.enablePayments ??
+    payload.enable_payments ??
+    true,
+  );
 
   const updateRow: Record<string, unknown> = {
     id: 1,
@@ -586,7 +678,9 @@ async function savePaymentSettings(request: Request, payload: Record<string, unk
     updated_at: new Date().toISOString(),
   };
 
-  const { error } = await serviceClient.from("payment_settings").upsert(updateRow);
+  const { error } = await serviceClient
+    .from("payment_settings")
+    .upsert(updateRow);
   if (error) {
     return json(500, { error: error.message });
   }
@@ -618,9 +712,13 @@ async function getPublicPaymentSettings() {
 
 function parseWebhookPayment(body: Record<string, unknown>) {
   const payload = body.payload as Record<string, unknown> | undefined;
-  const paymentEntity = (payload?.payment as Record<string, unknown> | undefined)?.entity as Record<string, unknown> | undefined;
-  const orderEntity = (payload?.order as Record<string, unknown> | undefined)?.entity as Record<string, unknown> | undefined;
-  const notes = (paymentEntity?.notes as Record<string, unknown> | undefined) ?? {};
+  const paymentEntity = (
+    payload?.payment as Record<string, unknown> | undefined
+  )?.entity as Record<string, unknown> | undefined;
+  const orderEntity = (payload?.order as Record<string, unknown> | undefined)
+    ?.entity as Record<string, unknown> | undefined;
+  const notes =
+    (paymentEntity?.notes as Record<string, unknown> | undefined) ?? {};
 
   return {
     event: String(body.event ?? "").trim(),
@@ -682,7 +780,8 @@ async function handleRazorpayWebhook(request: Request) {
     userId = userId || String(paymentRow?.user_id ?? "");
     courseId = courseId || String(paymentRow?.course_id ?? "");
     resolvedAmount = payment.amount || toNumber(paymentRow?.amount ?? 0);
-    resolvedCurrency = payment.currency || String(paymentRow?.currency ?? "INR");
+    resolvedCurrency =
+      payment.currency || String(paymentRow?.currency ?? "INR");
     resolvedProvider = String(paymentRow?.provider ?? "razorpay") || "razorpay";
     resolvedGstAmount = toNumber(paymentRow?.gst_amount ?? 0);
   }
@@ -718,8 +817,13 @@ async function handleRazorpayWebhook(request: Request) {
 }
 
 Deno.serve(async (request) => {
-  console.log("Edge function invoked, method:", request.method, "url:", request.url);
-  
+  console.log(
+    "Edge function invoked, method:",
+    request.method,
+    "url:",
+    request.url,
+  );
+
   if (request.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -751,7 +855,8 @@ Deno.serve(async (request) => {
         return json(400, { error: "Unknown payment action" });
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unexpected payment error";
+    const message =
+      error instanceof Error ? error.message : "Unexpected payment error";
     console.error("Edge function error:", error);
     return json(500, { error: message });
   }
