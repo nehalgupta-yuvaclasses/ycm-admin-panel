@@ -278,15 +278,39 @@ async function getRequestActor(
             return null;
           }
 
-          const { data: userRow, error: userError } = await serviceClient
-            .from("users")
-            .select("id, role, firebase_uid")
+          // Look up student by firebase_uid → get user_id
+          const { data: studentRow, error: studentError } = await serviceClient
+            .from("students")
+            .select("id, user_id")
             .eq("firebase_uid", firebaseUid)
             .maybeSingle();
 
-          if (userError || !userRow) {
-            if (debugLog) debugLog.firebaseNoUser = true;
+          if (studentError || !studentRow) {
+            if (debugLog) debugLog.firebaseNoStudent = true;
             return null;
+          }
+
+          // Try user_id lookup first (new users with proper linkage)
+          let actualUserId = String(studentRow.user_id ?? "");
+          let { data: userRow, error: userError } = await serviceClient
+            .from("users")
+            .select("id, role")
+            .eq("id", actualUserId)
+            .maybeSingle();
+
+          // Fallback: if user_id is NULL or lookup fails, query users by firebase_uid directly
+          if (!actualUserId || userError || !userRow) {
+            const { data: userRow2, error: userError2 } = await serviceClient
+              .from("users")
+              .select("id, role")
+              .eq("firebase_uid", firebaseUid)
+              .maybeSingle();
+
+            if (userError2 || !userRow2) {
+              if (debugLog) debugLog.firebaseNoUser = true;
+              return null;
+            }
+            userRow = userRow2;
           }
 
           return {
