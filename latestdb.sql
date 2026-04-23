@@ -56,6 +56,19 @@ CREATE TABLE public.contact_messages (
   status text DEFAULT 'new'::text CHECK (status = ANY (ARRAY['new'::text, 'read'::text, 'replied'::text])),
   CONSTRAINT contact_messages_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.course_instructors (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  course_id uuid NOT NULL,
+  instructor_id uuid NOT NULL,
+  role text NOT NULL DEFAULT 'co_instructor'::text CHECK (role = ANY (ARRAY['lead'::text, 'co_instructor'::text, 'assistant'::text])),
+  is_primary boolean NOT NULL DEFAULT false,
+  display_order integer NOT NULL DEFAULT 0,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT course_instructors_pkey PRIMARY KEY (id),
+  CONSTRAINT course_instructors_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.courses(id),
+  CONSTRAINT course_instructors_instructor_id_fkey FOREIGN KEY (instructor_id) REFERENCES public.instructors(id)
+);
 CREATE TABLE public.courses (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   title text NOT NULL,
@@ -72,6 +85,24 @@ CREATE TABLE public.courses (
   instructor_id uuid,
   visibility text NOT NULL DEFAULT 'Public'::text,
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  course_type text NOT NULL DEFAULT 'Hybrid'::text CHECK (course_type = ANY (ARRAY['Live'::text, 'Recorded'::text, 'Hybrid'::text])),
+  lifecycle_stage text NOT NULL DEFAULT 'Draft'::text CHECK (lifecycle_stage = ANY (ARRAY['Draft'::text, 'Review'::text, 'Published'::text, 'Archived'::text])),
+  access_mode text NOT NULL DEFAULT 'Open'::text CHECK (access_mode = ANY (ARRAY['Open'::text, 'InviteOnly'::text, 'Approval'::text])),
+  enrollment_mode text NOT NULL DEFAULT 'SelfEnroll'::text CHECK (enrollment_mode = ANY (ARRAY['SelfEnroll'::text, 'Manual'::text, 'Cohort'::text])),
+  drip_enabled boolean NOT NULL DEFAULT false,
+  drip_mode text NOT NULL DEFAULT 'Sequential'::text CHECK (drip_mode = ANY (ARRAY['Immediate'::text, 'Scheduled'::text, 'Sequential'::text])),
+  drip_interval_days integer NOT NULL DEFAULT 7 CHECK (drip_interval_days >= 0),
+  certificate_enabled boolean NOT NULL DEFAULT false,
+  certificate_template text DEFAULT ''::text,
+  analytics_enabled boolean NOT NULL DEFAULT true,
+  analytics_event_key text DEFAULT ''::text,
+  brand_color text NOT NULL DEFAULT '#111827'::text,
+  cover_image_url text DEFAULT ''::text,
+  publish_at timestamp with time zone,
+  archived_at timestamp with time zone,
+  assessment_mode text NOT NULL DEFAULT 'PerSubject'::text CHECK (assessment_mode = ANY (ARRAY['None'::text, 'PerSubject'::text, 'PerModule'::text, 'PerLesson'::text])),
+  assessment_notes text DEFAULT ''::text,
+  completion_threshold numeric NOT NULL DEFAULT 80 CHECK (completion_threshold >= 0::numeric AND completion_threshold <= 100::numeric),
   CONSTRAINT courses_pkey PRIMARY KEY (id),
   CONSTRAINT courses_instructor_id_fkey FOREIGN KEY (instructor_id) REFERENCES public.instructors(id)
 );
@@ -80,6 +111,13 @@ CREATE TABLE public.enrollments (
   student_id uuid,
   course_id uuid,
   created_at timestamp with time zone DEFAULT now(),
+  status text NOT NULL DEFAULT 'active'::text CHECK (status = ANY (ARRAY['active'::text, 'paused'::text, 'completed'::text, 'cancelled'::text])),
+  enrolled_at timestamp with time zone,
+  completed_at timestamp with time zone,
+  payment_status text NOT NULL DEFAULT 'pending'::text CHECK (payment_status = ANY (ARRAY['pending'::text, 'paid'::text, 'failed'::text, 'refunded'::text])),
+  source text NOT NULL DEFAULT 'web'::text,
+  access_expires_at timestamp with time zone,
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT enrollments_pkey PRIMARY KEY (id),
   CONSTRAINT enrollments_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
   CONSTRAINT enrollments_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.courses(id)
@@ -131,8 +169,21 @@ CREATE TABLE public.lessons (
   lesson_type text NOT NULL DEFAULT 'recorded'::text CHECK (lesson_type = ANY (ARRAY['recorded'::text, 'live'::text])),
   live_url text,
   scheduled_at timestamp with time zone,
+  is_live boolean NOT NULL DEFAULT false,
+  live_started_at timestamp with time zone,
+  live_ended_at timestamp with time zone,
+  live_by uuid,
+  content_type text NOT NULL DEFAULT 'recorded'::text,
+  resource_url text,
+  is_preview boolean NOT NULL DEFAULT false,
+  unlock_after_days integer NOT NULL DEFAULT 0,
+  assessment_test_id uuid,
+  completion_required boolean NOT NULL DEFAULT true,
+  published_at timestamp with time zone,
   CONSTRAINT lessons_pkey PRIMARY KEY (id),
-  CONSTRAINT lessons_module_id_fkey FOREIGN KEY (module_id) REFERENCES public.modules(id)
+  CONSTRAINT lessons_module_id_fkey FOREIGN KEY (module_id) REFERENCES public.modules(id),
+  CONSTRAINT lessons_live_by_fkey FOREIGN KEY (live_by) REFERENCES public.instructors(id),
+  CONSTRAINT lessons_assessment_test_id_fkey FOREIGN KEY (assessment_test_id) REFERENCES public.tests(id)
 );
 CREATE TABLE public.modules (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -142,9 +193,13 @@ CREATE TABLE public.modules (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   subject_id uuid NOT NULL,
+  module_type text NOT NULL DEFAULT 'content'::text,
+  drip_days_after_subject integer NOT NULL DEFAULT 0,
+  unlock_after_module_id uuid,
   CONSTRAINT modules_pkey PRIMARY KEY (id),
   CONSTRAINT modules_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.courses(id),
-  CONSTRAINT modules_subject_id_fkey FOREIGN KEY (subject_id) REFERENCES public.subjects(id)
+  CONSTRAINT modules_subject_id_fkey FOREIGN KEY (subject_id) REFERENCES public.subjects(id),
+  CONSTRAINT modules_unlock_after_module_id_fkey FOREIGN KEY (unlock_after_module_id) REFERENCES public.modules(id)
 );
 CREATE TABLE public.notifications (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -261,10 +316,10 @@ CREATE TABLE public.results (
   student_name text NOT NULL,
   exam text NOT NULL,
   rank text NOT NULL,
-  year text,
   image_url text,
   created_at timestamp with time zone DEFAULT now(),
   result text,
+  year text,
   CONSTRAINT results_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.site_settings (
@@ -304,6 +359,7 @@ CREATE TABLE public.subjects (
   created_at timestamp with time zone DEFAULT now(),
   order integer NOT NULL DEFAULT 0,
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  description text DEFAULT ''::text,
   CONSTRAINT subjects_pkey PRIMARY KEY (id),
   CONSTRAINT subjects_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.courses(id)
 );
@@ -323,9 +379,20 @@ CREATE TABLE public.tests (
   total_marks integer DEFAULT 100,
   status text DEFAULT 'draft'::text CHECK (status = ANY (ARRAY['published'::text, 'draft'::text])),
   created_at timestamp with time zone DEFAULT now(),
+  module_id uuid,
+  lesson_id uuid,
+  assessment_kind text NOT NULL DEFAULT 'quiz'::text CHECK (assessment_kind = ANY (ARRAY['quiz'::text, 'assignment'::text, 'mock'::text, 'exam'::text])),
+  attempt_limit integer NOT NULL DEFAULT 1,
+  passing_marks numeric NOT NULL DEFAULT 40,
+  duration_minutes integer,
+  instructions text DEFAULT ''::text,
+  published_at timestamp with time zone,
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT tests_pkey PRIMARY KEY (id),
   CONSTRAINT tests_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.courses(id),
-  CONSTRAINT tests_subject_id_fkey FOREIGN KEY (subject_id) REFERENCES public.subjects(id)
+  CONSTRAINT tests_subject_id_fkey FOREIGN KEY (subject_id) REFERENCES public.subjects(id),
+  CONSTRAINT tests_module_id_fkey FOREIGN KEY (module_id) REFERENCES public.modules(id),
+  CONSTRAINT tests_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(id)
 );
 CREATE TABLE public.users (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

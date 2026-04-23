@@ -262,10 +262,10 @@ export function CurriculumEditor({ courseId, modules, onSave, isSaving }: Curric
                           </Select>
                         </div>
                         {lesson.lessonType === "recorded" ? (
-                          <Input value={lesson.videoUrl} onChange={(event) => updateLesson(module.id, lesson.id, 'videoUrl', event.target.value)} placeholder="Video URL" />
+                          <Input value={lesson.videoUrl} onChange={(event) => updateLesson(module.id, lesson.id, 'videoUrl', event.target.value)} placeholder="YouTube recording URL" />
                         ) : (
                           <div className="grid gap-3 md:grid-cols-2">
-                            <Input value={lesson.liveUrl} onChange={(event) => updateLesson(module.id, lesson.id, 'liveUrl', event.target.value)} placeholder="Live class link" />
+                            <Input value={lesson.liveUrl} onChange={(event) => updateLesson(module.id, lesson.id, 'liveUrl', event.target.value)} placeholder="YouTube live URL" />
                             <Input type="datetime-local" value={lesson.scheduledAt} onChange={(event) => updateLesson(module.id, lesson.id, 'scheduledAt', event.target.value)} />
                           </div>
                         )}

@@ -151,13 +151,8 @@ export default function CourseBuilder() {
   async function handleStartLiveClass(lesson: LessonRecord) {
     if (!courseId) return;
     setLiveActionLessonId(lesson.id);
-    const meetingWindow = window.open("about:blank", "_blank");
-    if (meetingWindow) {
-      meetingWindow.document.title = "Opening live class...";
-      meetingWindow.document.body.innerHTML = "<p style='font-family:sans-serif;padding:24px'>Opening live class...</p>";
-    }
     try {
-      const { lesson: updatedLesson, meetingUrl } = await courseService.startLiveClass(courseId, lesson.id);
+      const { lesson: updatedLesson } = await courseService.startLiveClass(courseId, lesson.id);
       setDetails((current) => {
         if (!current) return current;
 
@@ -174,13 +169,6 @@ export default function CourseBuilder() {
 
         return { ...current, subjects: nextSubjects, modules: nextSubjects.flatMap((subject) => subject.modules) };
       });
-
-      if (meetingWindow) {
-        meetingWindow.location.replace(meetingUrl);
-        meetingWindow.focus();
-      } else {
-        window.open(meetingUrl, "_blank");
-      }
       toast.success("Live class started");
     } catch (error) {
       console.error("Failed to start live class:", error instanceof Error ? error.message : String(error));
