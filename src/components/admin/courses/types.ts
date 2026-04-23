@@ -23,9 +23,12 @@ export interface LessonDraft {
   lessonType: "recorded" | "live";
   contentType: "recorded" | "live" | "document" | "quiz" | "assignment";
   videoUrl: string;
+  youtubeLiveUrl?: string;
+  youtubeRecordingUrl?: string;
   liveUrl: string;
   scheduledAt: string;
   isLive: boolean;
+  isRecordedReady?: boolean;
   liveStartedAt: string;
   liveEndedAt: string;
   liveBy: string;
@@ -140,9 +143,12 @@ export interface LessonRecord {
   lessonType: "recorded" | "live";
   contentType: "recorded" | "live" | "document" | "quiz" | "assignment";
   videoUrl: string;
+  youtubeLiveUrl?: string;
+  youtubeRecordingUrl?: string;
   liveUrl: string;
   scheduledAt: string;
   isLive: boolean;
+  isRecordedReady?: boolean;
   liveStartedAt: string;
   liveEndedAt: string;
   liveBy: string;

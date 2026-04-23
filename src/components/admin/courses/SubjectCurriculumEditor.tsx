@@ -26,9 +26,12 @@ function createLesson(order: number, moduleId: string): LessonRecord {
     title: "",
     lessonType: "recorded",
     videoUrl: "",
+    youtubeLiveUrl: "",
+    youtubeRecordingUrl: "",
     liveUrl: "",
     scheduledAt: "",
     isLive: false,
+    isRecordedReady: false,
     liveStartedAt: "",
     liveEndedAt: "",
     liveBy: "",
@@ -120,7 +123,7 @@ export function SubjectCurriculumEditor({
     }));
   };
 
-  const updateLesson = (subjectId: string, moduleId: string, lessonId: string, field: keyof LessonRecord, value: string) => {
+  const updateLesson = (subjectId: string, moduleId: string, lessonId: string, field: keyof LessonRecord, value: string | boolean) => {
     setDraft((current) => current.map((subject) => {
       if (subject.id !== subjectId) return subject;
       return {
@@ -135,14 +138,19 @@ export function SubjectCurriculumEditor({
               if (field === "lessonType") {
                 if (value === "live") {
                   nextLesson.videoUrl = "";
+                  nextLesson.isRecordedReady = false;
                 } else {
                   nextLesson.liveUrl = "";
+                  nextLesson.youtubeLiveUrl = "";
                   nextLesson.scheduledAt = "";
                   nextLesson.isLive = false;
                   nextLesson.liveStartedAt = "";
                   nextLesson.liveEndedAt = "";
                   nextLesson.liveBy = "";
                 }
+              }
+              if (field === "isRecordedReady") {
+                nextLesson.isRecordedReady = Boolean(value);
               }
               return nextLesson;
             }),
@@ -478,10 +486,21 @@ export function SubjectCurriculumEditor({
                                 )}
                               </div>
                               {lesson.lessonType === "recorded" ? (
-                                <Input value={lesson.videoUrl} onChange={(event) => updateLesson(subject.id, module.id, lesson.id, 'videoUrl', event.target.value)} placeholder="Video URL" />
+                                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+                                  <Input value={lesson.youtubeRecordingUrl || lesson.videoUrl} onChange={(event) => updateLesson(subject.id, module.id, lesson.id, 'youtubeRecordingUrl', event.target.value)} placeholder="YouTube recording URL" />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="rounded-lg"
+                                    onClick={() => updateLesson(subject.id, module.id, lesson.id, 'isRecordedReady', true)}
+                                    disabled={!(lesson.youtubeRecordingUrl || lesson.videoUrl)}
+                                  >
+                                    Mark Recording Ready
+                                  </Button>
+                                </div>
                               ) : (
                                 <div className="grid gap-3 md:grid-cols-2">
-                                  <Input value={lesson.liveUrl} onChange={(event) => updateLesson(subject.id, module.id, lesson.id, 'liveUrl', event.target.value)} placeholder="Live class link" />
+                                  <Input value={lesson.youtubeLiveUrl || lesson.liveUrl} onChange={(event) => updateLesson(subject.id, module.id, lesson.id, 'youtubeLiveUrl', event.target.value)} placeholder="YouTube live URL" />
                                   <Input type="datetime-local" value={lesson.scheduledAt} onChange={(event) => updateLesson(subject.id, module.id, lesson.id, 'scheduledAt', event.target.value)} />
                                 </div>
                               )}
@@ -514,6 +533,8 @@ export function SubjectCurriculumEditor({
                                     Start Live Class
                                   </Button>
                                 )
+                              ) : lesson.isRecordedReady ? (
+                                <Badge variant="outline" className="rounded-lg border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-700">Recording ready</Badge>
                               ) : null}
 
                               <div className="flex items-center gap-1">

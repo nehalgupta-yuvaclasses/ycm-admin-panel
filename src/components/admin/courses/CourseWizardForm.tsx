@@ -211,10 +211,10 @@ function validateStep(values: CourseFormValues, step: number) {
         for (const lesson of module.lessons) {
           if (!lesson.title.trim()) return "Each lesson needs a title.";
           if (lesson.lessonType === "live") {
-            if (!lesson.liveUrl.trim()) return "Live lessons need a meeting link.";
+            if (!lesson.liveUrl.trim()) return "Live lessons need a YouTube live URL.";
             if (!lesson.scheduledAt.trim()) return "Live lessons need a scheduled time.";
           }
-          if (lesson.contentType === "recorded" && !lesson.videoUrl.trim()) return "Recorded lessons need a video URL.";
+          if (lesson.contentType === "recorded" && !lesson.videoUrl.trim()) return "Recorded lessons need a YouTube recording URL.";
           if (lesson.contentType === "document" && !lesson.resourceUrl.trim()) return "Document lessons need a resource URL.";
           if ((lesson.contentType === "quiz" || lesson.contentType === "assignment") && !lesson.notes.trim() && !lesson.resourceUrl.trim()) {
             return "Assessments need notes or a resource link.";
@@ -687,11 +687,11 @@ export function CourseForm({
 
                           {lesson.lessonType === "live" ? (
                             <div className="grid gap-3 md:grid-cols-2">
-                              <Input value={lesson.liveUrl} onChange={(event) => updateLesson(subject.id, module.id, lesson.id, "liveUrl", event.target.value)} placeholder="Meeting link" />
+                              <Input value={lesson.liveUrl} onChange={(event) => updateLesson(subject.id, module.id, lesson.id, "liveUrl", event.target.value)} placeholder="YouTube live URL" />
                               <Input type="datetime-local" value={lesson.scheduledAt} onChange={(event) => updateLesson(subject.id, module.id, lesson.id, "scheduledAt", event.target.value)} />
                             </div>
                           ) : (
-                            <Input value={lesson.videoUrl} onChange={(event) => updateLesson(subject.id, module.id, lesson.id, "videoUrl", event.target.value)} placeholder="Video URL" />
+                            <Input value={lesson.videoUrl} onChange={(event) => updateLesson(subject.id, module.id, lesson.id, "videoUrl", event.target.value)} placeholder="YouTube recording URL" />
                           )}
 
                           <Textarea value={lesson.notes} onChange={(event) => updateLesson(subject.id, module.id, lesson.id, "notes", event.target.value)} placeholder="Lesson notes or instructions" className="min-h-24" />
