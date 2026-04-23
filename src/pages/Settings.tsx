@@ -42,7 +42,6 @@ type PlatformState = {
 type PaymentState = {
   provider: "razorpay";
   apiKey: string;
-  apiSecret?: string;
   currency: "INR";
   gstRate: number;
   enablePayments: boolean;
@@ -88,7 +87,6 @@ const DEFAULT_PLATFORM: PlatformState = {
 const DEFAULT_PAYMENT: PaymentState = {
   provider: "razorpay",
   apiKey: "",
-  apiSecret: "",
   currency: "INR",
   gstRate: 18,
   enablePayments: true,
@@ -252,7 +250,6 @@ export default function Settings() {
           currency: DEFAULT_PAYMENT.currency,
           gstRate: paymentData.gst_rate ?? DEFAULT_PAYMENT.gstRate,
           enablePayments: Boolean(paymentData.is_enabled ?? paymentData.enable_payments),
-          apiSecret: "",
         });
       }
 
@@ -531,7 +528,6 @@ export default function Settings() {
         body: {
           action: "save_payment_settings",
           apiKey: values.apiKey,
-          apiSecret: values.apiSecret?.trim() || "",
           gstRate: values.gstRate,
           isEnabled: values.enablePayments,
         },
@@ -556,7 +552,6 @@ export default function Settings() {
       setPayment({
         provider: values.provider,
         apiKey: values.apiKey,
-        apiSecret: "",
         currency: values.currency,
         gstRate: values.gstRate,
         enablePayments: values.enablePayments,

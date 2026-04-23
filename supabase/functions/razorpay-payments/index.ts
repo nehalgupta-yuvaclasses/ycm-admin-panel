@@ -5,7 +5,6 @@ type PaymentSettingsRow = {
   id: number;
   provider: string;
   api_key: string;
-  api_secret: string | null;
   currency: string;
   gst_rate: number | string;
   enable_payments?: boolean | null;
@@ -30,6 +29,13 @@ type PaymentRow = {
   provider?: string | null;
   currency?: string | null;
   gst_amount?: number | string | null;
+};
+
+type PaymentSyncRow = {
+  payment_uuid: string;
+  enrollment_uuid: string | null;
+  payment_status: string;
+  enrollment_status: string | null;
 };
 
 type RequestActor = {
@@ -269,7 +275,7 @@ async function getRequestActor(
 async function loadPaymentSettings(serviceClient: ReturnType<typeof getSupabaseClients>["serviceClient"]): Promise<PaymentSettingsRow | null> {
   const { data, error } = await serviceClient
     .from("payment_settings")
-    .select("id, provider, api_key, api_secret, currency, gst_rate, enable_payments, is_enabled")
+    .select("id, provider, api_key, currency, gst_rate, enable_payments, is_enabled")
     .eq("id", 1)
     .maybeSingle();
 
@@ -281,7 +287,47 @@ async function loadPaymentSettings(serviceClient: ReturnType<typeof getSupabaseC
 }
 
 function getSecret(settings: PaymentSettingsRow | null) {
-  return Deno.env.get("RAZORPAY_KEY_SECRET") ?? settings?.api_secret ?? "";
+  return Deno.env.get("RAZORPAY_KEY_SECRET") ?? "";
+}
+
+async function syncRazorpayPayment(
+  serviceClient: ReturnType<typeof getSupabaseClients>["serviceClient"],
+  payload: {
+    userId: string;
+    courseId: string;
+    orderId: string;
+    paymentId?: string | null;
+    signature?: string | null;
+    amount: number;
+    currency: string;
+    provider: string;
+    gstAmount: number;
+    status: string;
+    source: string;
+    verifiedAt?: string | null;
+  },
+) {
+  const { data, error } = await serviceClient.rpc("sync_razorpay_payment", {
+    p_user_id: payload.userId,
+    p_course_id: payload.courseId,
+    p_order_id: payload.orderId,
+    p_payment_id: payload.paymentId ?? null,
+    p_signature: payload.signature ?? null,
+    p_amount: payload.amount,
+    p_currency: payload.currency,
+    p_provider: payload.provider,
+    p_gst_amount: payload.gstAmount,
+    p_status: payload.status,
+    p_source: payload.source,
+    p_verified_at: payload.verifiedAt ?? null,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  const rows = (data as PaymentSyncRow[] | null) ?? [];
+  return rows[0] ?? null;
 }
 
 async function hmacSha256Hex(secret: string, payload: string) {
@@ -387,26 +433,21 @@ async function createRazorpayOrder(request: Request, payload: Record<string, unk
 
   const order = await razorpayResponse.json();
 
-  const paymentInsert = {
-    student_id: actor.id,
-    user_id: actor.id,
-    course_id: courseId,
-    order_id: order.id,
-    payment_id: null,
-    amount: expected.totalAmount,
-    status: "pending",
-    provider: settings.provider,
-    currency: settings.currency || "INR",
-    gst_amount: expected.gstAmount,
-    created_at: new Date().toISOString(),
-  };
-
-  const { error: paymentError } = await serviceClient.from("payments").upsert(paymentInsert, {
-    onConflict: "order_id",
-  });
-
-  if (paymentError) {
-    return json(500, { error: paymentError.message });
+  try {
+    await syncRazorpayPayment(serviceClient, {
+      userId: actor.id,
+      courseId,
+      orderId: order.id,
+      amount: expected.totalAmount,
+      currency: settings.currency || "INR",
+      provider: settings.provider,
+      gstAmount: expected.gstAmount,
+      status: "pending",
+      source: "web",
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to persist payment order";
+    return json(500, { error: message });
   }
 
   return json(200, {
@@ -463,44 +504,47 @@ async function verifyPayment(request: Request, payload: Record<string, unknown>)
 
   const expectedSignature = await hmacSha256Hex(secret, `${razorpayOrderId}|${razorpayPaymentId}`);
   if (expectedSignature !== razorpaySignature) {
-    await serviceClient
-      .from("payments")
-      .update({ status: "failed", payment_id: razorpayPaymentId })
-      .eq("order_id", razorpayOrderId);
+    try {
+      await syncRazorpayPayment(serviceClient, {
+        userId: row.user_id,
+        courseId: row.course_id,
+        orderId: razorpayOrderId,
+        paymentId: razorpayPaymentId,
+        signature: razorpaySignature,
+        amount: toNumber(row.amount),
+        currency: row.currency ?? settings?.currency ?? "INR",
+        provider: row.provider ?? settings?.provider ?? "razorpay",
+        gstAmount: toNumber(row.gst_amount ?? 0),
+        status: "failed",
+        source: "web",
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to mark payment as failed";
+      return json(500, { error: message });
+    }
 
     return json(400, { error: "Invalid Razorpay signature" });
   }
 
-  const { error: updateError } = await serviceClient
-    .from("payments")
-    .update({
+  let syncResult: PaymentSyncRow | null = null;
+  try {
+    syncResult = await syncRazorpayPayment(serviceClient, {
+      userId: row.user_id,
+      courseId: row.course_id,
+      orderId: razorpayOrderId,
+      paymentId: razorpayPaymentId,
+      signature: razorpaySignature,
+      amount: toNumber(row.amount),
+      currency: row.currency ?? settings?.currency ?? "INR",
+      provider: row.provider ?? settings?.provider ?? "razorpay",
+      gstAmount: toNumber(row.gst_amount ?? 0),
       status: "success",
-      payment_id: razorpayPaymentId,
-      verified_at: new Date().toISOString(),
-    })
-    .eq("order_id", razorpayOrderId);
-
-  if (updateError) {
-    return json(500, { error: updateError.message });
-  }
-
-  const { data: existingEnrollment } = await serviceClient
-    .from("enrollments")
-    .select("id")
-    .eq("student_id", row.user_id)
-    .eq("course_id", row.course_id)
-    .maybeSingle();
-
-  if (!existingEnrollment) {
-    const { error: enrollmentError } = await serviceClient.from("enrollments").insert({
-      student_id: row.user_id,
-      course_id: row.course_id,
-      created_at: new Date().toISOString(),
+      source: "web",
+      verifiedAt: new Date().toISOString(),
     });
-
-    if (enrollmentError) {
-      return json(500, { error: enrollmentError.message });
-    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to finalize payment";
+    return json(500, { error: message });
   }
 
   return json(200, {
@@ -508,6 +552,7 @@ async function verifyPayment(request: Request, payload: Record<string, unknown>)
     paymentId: razorpayPaymentId,
     orderId: razorpayOrderId,
     courseId: row.course_id,
+    enrollmentId: syncResult?.enrollment_uuid ?? null,
   });
 }
 
@@ -526,7 +571,6 @@ async function savePaymentSettings(request: Request, payload: Record<string, unk
 
   const provider = String(payload.provider ?? "razorpay").trim() || "razorpay";
   const apiKey = String(payload.apiKey ?? payload.api_key ?? "").trim();
-  const apiSecret = String(payload.apiSecret ?? payload.api_secret ?? "").trim();
   const currency = String(payload.currency ?? "INR").trim() || "INR";
   const gstRate = toNumber(payload.gstRate ?? payload.gst_rate ?? 18);
   const isEnabled = Boolean(payload.isEnabled ?? payload.enablePayments ?? payload.enable_payments ?? true);
@@ -535,15 +579,12 @@ async function savePaymentSettings(request: Request, payload: Record<string, unk
     id: 1,
     provider,
     api_key: apiKey,
+    api_secret: "",
     currency,
     gst_rate: gstRate,
     is_enabled: isEnabled,
     updated_at: new Date().toISOString(),
   };
-
-  if (apiSecret) {
-    updateRow.api_secret = apiSecret;
-  }
 
   const { error } = await serviceClient.from("payment_settings").upsert(updateRow);
   if (error) {
@@ -575,6 +616,107 @@ async function getPublicPaymentSettings() {
   });
 }
 
+function parseWebhookPayment(body: Record<string, unknown>) {
+  const payload = body.payload as Record<string, unknown> | undefined;
+  const paymentEntity = (payload?.payment as Record<string, unknown> | undefined)?.entity as Record<string, unknown> | undefined;
+  const orderEntity = (payload?.order as Record<string, unknown> | undefined)?.entity as Record<string, unknown> | undefined;
+  const notes = (paymentEntity?.notes as Record<string, unknown> | undefined) ?? {};
+
+  return {
+    event: String(body.event ?? "").trim(),
+    paymentId: String(paymentEntity?.id ?? "").trim(),
+    orderId: String(paymentEntity?.order_id ?? orderEntity?.id ?? "").trim(),
+    userId: String(notes.user_id ?? "").trim(),
+    courseId: String(notes.course_id ?? "").trim(),
+    amount: toNumber(paymentEntity?.amount ?? 0) / 100,
+    currency: String(paymentEntity?.currency ?? "INR").trim() || "INR",
+  };
+}
+
+async function handleRazorpayWebhook(request: Request) {
+  const rawBody = await request.text();
+  const webhookSecret = Deno.env.get("RAZORPAY_WEBHOOK_SECRET") ?? "";
+  const signature = request.headers.get("x-razorpay-signature") ?? "";
+
+  if (!webhookSecret) {
+    return json(500, { error: "Razorpay webhook secret is not configured" });
+  }
+
+  const expectedSignature = await hmacSha256Hex(webhookSecret, rawBody);
+  if (expectedSignature !== signature) {
+    return json(400, { error: "Invalid webhook signature" });
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = JSON.parse(rawBody) as Record<string, unknown>;
+  } catch {
+    return json(400, { error: "Invalid webhook payload" });
+  }
+
+  const { serviceClient } = getSupabaseClients();
+  const payment = parseWebhookPayment(body);
+
+  if (!payment.orderId) {
+    return json(400, { error: "Webhook is missing an order ID" });
+  }
+
+  let userId = payment.userId;
+  let courseId = payment.courseId;
+  let resolvedAmount = payment.amount;
+  let resolvedCurrency = payment.currency;
+  let resolvedProvider = "razorpay";
+  let resolvedGstAmount = 0;
+
+  if (!userId || !courseId) {
+    const { data: paymentRow, error } = await serviceClient
+      .from("payments")
+      .select("user_id, course_id, amount, provider, currency, gst_amount")
+      .eq("order_id", payment.orderId)
+      .maybeSingle();
+
+    if (error) {
+      return json(500, { error: error.message });
+    }
+
+    userId = userId || String(paymentRow?.user_id ?? "");
+    courseId = courseId || String(paymentRow?.course_id ?? "");
+    resolvedAmount = payment.amount || toNumber(paymentRow?.amount ?? 0);
+    resolvedCurrency = payment.currency || String(paymentRow?.currency ?? "INR");
+    resolvedProvider = String(paymentRow?.provider ?? "razorpay") || "razorpay";
+    resolvedGstAmount = toNumber(paymentRow?.gst_amount ?? 0);
+  }
+
+  if (!userId || !courseId) {
+    return json(400, { error: "Webhook could not resolve payment context" });
+  }
+
+  const normalizedEvent = payment.event.toLowerCase();
+  const status = normalizedEvent.includes("failed") ? "failed" : "success";
+
+  const syncResult = await syncRazorpayPayment(serviceClient, {
+    userId,
+    courseId,
+    orderId: payment.orderId,
+    paymentId: payment.paymentId || null,
+    signature,
+    amount: resolvedAmount,
+    currency: resolvedCurrency,
+    provider: resolvedProvider,
+    gstAmount: resolvedGstAmount,
+    status,
+    source: "webhook",
+    verifiedAt: new Date().toISOString(),
+  });
+
+  return json(200, {
+    success: true,
+    event: payment.event,
+    paymentId: syncResult?.payment_uuid ?? null,
+    enrollmentId: syncResult?.enrollment_uuid ?? null,
+  });
+}
+
 Deno.serve(async (request) => {
   console.log("Edge function invoked, method:", request.method, "url:", request.url);
   
@@ -584,6 +726,10 @@ Deno.serve(async (request) => {
 
   if (request.method !== "POST") {
     return json(405, { error: "Method not allowed" });
+  }
+
+  if (request.headers.has("x-razorpay-signature")) {
+    return await handleRazorpayWebhook(request);
   }
 
   const body = await request.json().catch(() => ({}));
