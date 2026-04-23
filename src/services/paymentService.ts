@@ -2,7 +2,8 @@ import { supabase } from "@/lib/supabaseClient";
 
 export interface Payment {
   id?: string;
-  student_id: string;
+  student_id?: string | null;
+  user_id?: string | null;
   course_id: string;
   amount: number;
   status: string;
@@ -63,18 +64,40 @@ export const paymentService = {
       }
 
       if (status === "Completed" && data) {
+        const userId = data.user_id ?? data.student_id ?? null;
         const { student_id, course_id } = data;
+
+        if (!userId && !student_id) {
+          return data;
+        }
+
+        const enrollmentFilters = [] as string[];
+        if (userId) {
+          enrollmentFilters.push(`user_id.eq.${userId}`);
+        }
+        if (student_id) {
+          enrollmentFilters.push(`student_id.eq.${student_id}`);
+        }
+
         const { data: enrollment } = await supabase
           .from("enrollments")
           .select("*")
-          .eq("student_id", student_id)
+          .or(enrollmentFilters.join(","))
           .eq("course_id", course_id)
-          .single();
+          .maybeSingle();
 
         if (!enrollment) {
           await supabase
             .from("enrollments")
-            .insert([{ student_id, course_id }]);
+            .insert([
+              {
+                student_id,
+                user_id: userId,
+                course_id,
+                payment_status: "paid",
+                status: "active",
+              },
+            ]);
         }
       }
 

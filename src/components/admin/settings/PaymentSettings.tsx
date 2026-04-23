@@ -15,7 +15,6 @@ type PaymentProps = {
   settings: {
     provider: "razorpay";
     apiKey: string;
-    apiSecret?: string;
     currency: string;
     gstRate: number;
     enablePayments: boolean;
@@ -30,7 +29,6 @@ export function PaymentSettings({ settings, onSave, isSaving }: PaymentProps) {
     defaultValues: {
       provider: settings.provider,
       apiKey: settings.apiKey,
-      apiSecret: settings.apiSecret || "",
       currency: settings.currency,
       gstRate: settings.gstRate,
       enablePayments: settings.enablePayments,
@@ -41,7 +39,6 @@ export function PaymentSettings({ settings, onSave, isSaving }: PaymentProps) {
     form.reset({
       provider: settings.provider,
       apiKey: settings.apiKey,
-      apiSecret: settings.apiSecret || "",
       currency: settings.currency,
       gstRate: settings.gstRate,
       enablePayments: settings.enablePayments,
@@ -58,7 +55,7 @@ export function PaymentSettings({ settings, onSave, isSaving }: PaymentProps) {
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <CardTitle className="text-xl font-semibold">Payments</CardTitle>
-            <CardDescription>Set the gateway, secret credentials, and billing defaults.</CardDescription>
+            <CardDescription>Set the gateway, billing defaults, and payment availability.</CardDescription>
           </div>
           <Badge
             variant="outline"
@@ -104,23 +101,6 @@ export function PaymentSettings({ settings, onSave, isSaving }: PaymentProps) {
 
               <FormField
                 control={form.control}
-                name="apiSecret"
-                render={({ field }) => (
-                  <FormItem className="md:col-span-2">
-                    <FormLabel>API secret</FormLabel>
-                    <FormControl>
-                      <Input {...field} type="password" autoComplete="off" placeholder="Leave blank to keep the current server secret" />
-                    </FormControl>
-                    <p className="text-xs text-muted-foreground">
-                      Secret values are handled server-side and are never reloaded into the browser.
-                    </p>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
                 name="gstRate"
                 render={({ field }) => (
                   <FormItem>
@@ -152,7 +132,7 @@ export function PaymentSettings({ settings, onSave, isSaving }: PaymentProps) {
 
             <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/20 p-4 text-sm text-muted-foreground">
               <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-              Store the public key here and keep the secret blank unless you are rotating credentials. The backend function persists secrets without exposing them back to the UI.
+              Store the public key here. The backend reads the Razorpay secret from server-side environment configuration only.
             </div>
 
             <div className="flex justify-end">
