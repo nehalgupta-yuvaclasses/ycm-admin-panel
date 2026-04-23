@@ -18,6 +18,7 @@ import { storageService } from "@/services/storageService";
 const resultSchema = z.object({
   student_name: z.string().trim().min(2, "Student name is required"),
   exam: z.string().trim().min(2, "Exam is required"),
+  year: z.string().trim().regex(/^\d{4}$/, "Year must be a 4-digit year"),
   result: z.string().trim().min(1, "Result is required"),
   image_url: z.string().trim().min(1, "Image URL is required"),
 });
@@ -27,6 +28,7 @@ type ResultFormValues = z.infer<typeof resultSchema>;
 const emptyValues: ResultFormValues = {
   student_name: "",
   exam: "",
+  year: "",
   result: "",
   image_url: "",
 };
@@ -69,6 +71,7 @@ export function ResultsManager() {
           ? {
               student_name: editingItem.student_name,
               exam: editingItem.exam,
+              year: editingItem.year || "",
               result: editingItem.result || editingItem.rank || "",
               image_url: editingItem.image_url || "",
             }
@@ -93,6 +96,7 @@ export function ResultsManager() {
       const payload = {
         student_name: values.student_name,
         exam: values.exam,
+        year: values.year,
         result: values.result,
         rank: values.result,
         image_url: values.image_url,
@@ -164,6 +168,7 @@ export function ResultsManager() {
                 <div className="space-y-1.5">
                   <p className="truncate text-sm font-semibold leading-none text-foreground">{item.student_name}</p>
                   <p className="truncate text-xs text-muted-foreground">{item.exam}</p>
+                  <p className="text-xs font-medium text-muted-foreground">Year: {item.year || "-"}</p>
                 </div>
                 <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2 text-sm">
                   <span className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">Result</span>
@@ -220,7 +225,7 @@ export function ResultsManager() {
                   )}
                 />
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-3">
                   <FormField
                     control={control}
                     name="exam"
@@ -234,6 +239,20 @@ export function ResultsManager() {
                       </FormItem>
                     )}
                   />
+
+                    <FormField
+                      control={control}
+                      name="year"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Year</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="2025" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
                   <FormField
                     control={control}

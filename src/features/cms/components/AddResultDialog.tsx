@@ -10,6 +10,7 @@ import { FormDialog } from "@/components/shared/FormDialog";
 const resultSchema = z.object({
   student_name: z.string().trim().min(2, "Student name is required"),
   exam: z.string().trim().min(2, "Exam name is required"),
+  year: z.string().trim().regex(/^\d{4}$/, "Year must be a 4-digit year"),
   rank: z.string().trim().min(1, "Rank or score is required"),
 });
 
@@ -31,7 +32,7 @@ export function AddResultDialog({
   const [imageFile, setImageFile] = React.useState<File | null>(null);
   const form = useForm<ResultFormValues>({
     resolver: zodResolver(resultSchema),
-    defaultValues: { student_name: "", exam: "", rank: "" },
+    defaultValues: { student_name: "", exam: "", year: "", rank: "" },
   });
 
   const { handleSubmit, reset, control } = form;
@@ -85,6 +86,20 @@ export function AddResultDialog({
                 <FormLabel>Exam</FormLabel>
                 <FormControl>
                   <Input {...field} placeholder="e.g. NEET 2024" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={control}
+            name="year"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Year</FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="e.g. 2025" />
                 </FormControl>
                 <FormMessage />
               </FormItem>

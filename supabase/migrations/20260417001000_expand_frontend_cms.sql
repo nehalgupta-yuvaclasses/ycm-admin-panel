@@ -7,6 +7,13 @@ alter table public.banners
 alter table public.results
   add column if not exists result text;
 
+alter table public.results
+  add column if not exists year text;
+
+update public.results
+set year = coalesce(year, extract(year from created_at)::text)
+where year is null;
+
 create table if not exists public.homepage_content (
   id uuid not null default gen_random_uuid(),
   hero_title text not null default ''::text,

@@ -261,6 +261,7 @@ CREATE TABLE public.results (
   student_name text NOT NULL,
   exam text NOT NULL,
   rank text NOT NULL,
+  year text,
   image_url text,
   created_at timestamp with time zone DEFAULT now(),
   result text,

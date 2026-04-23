@@ -53,6 +53,7 @@ export interface Result {
   exam: string;
   rank: string;
   result: string;
+  year?: string;
   image_url?: string;
 }
 
